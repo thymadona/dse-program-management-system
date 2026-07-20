@@ -7,9 +7,24 @@ import type { Role } from "../auth/token.ts";
  * permission a route needs; this map decides which roles hold it.
  */
 const ROLE_PERMISSIONS: Record<Role, string[]> = {
-  admin: ["students:read", "students:write"],
-  lecturer: ["students:read"],
-  student: ["students:read"],
+  admin: [
+    "students:read",
+    "students:write",
+    "courses:read",
+    "courses:write",
+    "offerings:read",
+    "offerings:write",
+    "lecturers:read",
+  ],
+  lecturer: [
+    "students:read",
+    "courses:read",
+    "courses:write",
+    "offerings:read",
+    "offerings:write",
+    "lecturers:read",
+  ],
+  student: ["students:read", "courses:read", "offerings:read", "lecturers:read"],
 };
 
 export function roleHasPermission(role: Role, permission: string): boolean {

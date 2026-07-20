@@ -2,6 +2,9 @@ import cors from "cors";
 import express, { type Express } from "express";
 import { registry } from "./plugins/registry.ts";
 import { studentsPlugin } from "../plugins/students/index.ts";
+import { lecturersPlugin } from "../plugins/lecturers/index.ts";
+import { coursesPlugin } from "../plugins/courses/index.ts";
+import { offeringsPlugin } from "../plugins/offerings/index.ts";
 
 /**
  * Builds the Express app: registers plugins, mounts each plugin router at
@@ -10,7 +13,12 @@ import { studentsPlugin } from "../plugins/students/index.ts";
  */
 export function createApp(): Express {
   // Register plugins (one line per plugin — this is the only place they're listed).
+  // Cross-plugin dependencies are resolved lazily at request time via the registry,
+  // so registration order is not significant, but we list providers first for clarity.
   registry.register(studentsPlugin);
+  registry.register(lecturersPlugin);
+  registry.register(coursesPlugin);
+  registry.register(offeringsPlugin);
 
   const app = express();
 

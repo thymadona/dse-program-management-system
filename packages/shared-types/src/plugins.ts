@@ -56,7 +56,39 @@ export const studentsManifest: PluginManifest = {
   permissions: ["students:read", "students:write"],
 };
 
-export const pluginManifests: PluginManifest[] = [studentsManifest];
+export const coursesManifest: PluginManifest = {
+  id: "courses",
+  name: "Courses",
+  version: "0.1.0",
+  description: "Courses — CRUD, list, assign lecturer.",
+  routes: [{ label: "Courses", path: "/courses", icon: "book" }],
+  permissions: ["courses:read", "courses:write"],
+};
+
+export const offeringsManifest: PluginManifest = {
+  id: "offerings",
+  name: "Course Offerings",
+  version: "0.1.0",
+  description: "Links Students, Courses and Lecturers for a given term.",
+  routes: [{ label: "Course Offerings", path: "/offerings", icon: "layers" }],
+  permissions: ["offerings:read", "offerings:write"],
+};
+
+export const lecturersManifest: PluginManifest = {
+  id: "lecturers",
+  name: "Lecturers",
+  version: "0.1.0",
+  description: "Lecturers (read-only) — Users with the lecturer role.",
+  routes: [{ label: "Lecturers", path: "/lecturers", icon: "presentation" }],
+  permissions: ["lecturers:read"],
+};
+
+export const pluginManifests: PluginManifest[] = [
+  studentsManifest,
+  coursesManifest,
+  offeringsManifest,
+  lecturersManifest,
+];
 
 /** Sidebar nav is generated automatically from plugin routes. */
 export function navFromManifests(manifests: PluginManifest[]): PluginRoute[] {

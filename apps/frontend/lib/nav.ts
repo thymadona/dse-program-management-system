@@ -1,4 +1,11 @@
-import { LayoutDashboard, Users, type LucideIcon } from "lucide-react";
+import {
+  Book,
+  Layers,
+  LayoutDashboard,
+  Presentation,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { navFromManifests, pluginManifests, type PluginRoute } from "@dse-pms/shared-types";
 
 /**
@@ -8,6 +15,9 @@ import { navFromManifests, pluginManifests, type PluginRoute } from "@dse-pms/sh
  */
 export const iconMap: Record<string, LucideIcon> = {
   users: Users,
+  book: Book,
+  layers: Layers,
+  presentation: Presentation,
   dashboard: LayoutDashboard,
 };
 

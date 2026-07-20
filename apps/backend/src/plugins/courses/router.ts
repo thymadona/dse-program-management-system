@@ -1,0 +1,82 @@
+import { Router } from "express";
+import { CreateCourseInput, ListCoursesQuery, UpdateCourseInput } from "@dse-pms/shared-types";
+import { requireAuth } from "../../core/auth/middleware.ts";
+import { requirePermission } from "../../core/permissions/index.ts";
+import { courseService, ReferenceError } from "./service.ts";
+
+export function createCourseRouter(): Router {
+  const router = Router();
+  router.use(requireAuth);
+
+  router.get("/", requirePermission("courses:read"), async (req, res) => {
+    const parsed = ListCoursesQuery.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
+      return;
+    }
+    res.json(await courseService.list(parsed.data));
+  });
+
+  router.get("/:id", requirePermission("courses:read"), async (req, res) => {
+    const course = await courseService.getDetailed(req.params.id!);
+    if (!course) {
+      res.status(404).json({ error: "Course not found" });
+      return;
+    }
+    res.json(course);
+  });
+
+  router.post("/", requirePermission("courses:write"), async (req, res) => {
+    const parsed = CreateCourseInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.status(201).json(await courseService.create(parsed.data));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err, "code") ?? "Could not create course" });
+    }
+  });
+
+  router.patch("/:id", requirePermission("courses:write"), async (req, res) => {
+    const parsed = UpdateCourseInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await courseService.update(req.params.id!, parsed.data));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err, "code") ?? "Could not update course" });
+    }
+  });
+
+  router.delete("/:id", requirePermission("courses:write"), async (req, res) => {
+    try {
+      await courseService.remove(req.params.id!);
+      res.status(204).end();
+    } catch {
+      res.status(404).json({ error: "Course not found" });
+    }
+  });
+
+  return router;
+}
+
+/** Map service/Prisma errors to HTTP status. */
+function errStatus(err: unknown): number {
+  if (err instanceof ReferenceError) return 400;
+  const code = (err as { code?: string }).code;
+  if (code === "P2002") return 409;
+  if (code === "P2025") return 404;
+  return 409;
+}
+
+function errMessage(err: unknown, uniqueField: string): string | null {
+  if (err instanceof ReferenceError) return err.message;
+  const code = (err as { code?: string }).code;
+  if (code === "P2002") return `A course with that ${uniqueField} already exists`;
+  if (code === "P2025") return "Course not found";
+  return null;
+}

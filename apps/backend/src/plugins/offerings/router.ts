@@ -1,0 +1,117 @@
+import { Router } from "express";
+import {
+  CreateOfferingInput,
+  EnrollInput,
+  ListOfferingsQuery,
+  UpdateOfferingInput,
+} from "@dse-pms/shared-types";
+import { requireAuth } from "../../core/auth/middleware.ts";
+import { requirePermission } from "../../core/permissions/index.ts";
+import { CapacityError, offeringService, ReferenceError } from "./service.ts";
+
+export function createOfferingRouter(): Router {
+  const router = Router();
+  router.use(requireAuth);
+
+  router.get("/", requirePermission("offerings:read"), async (req, res) => {
+    const parsed = ListOfferingsQuery.safeParse(req.query);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
+      return;
+    }
+    res.json(await offeringService.list(parsed.data));
+  });
+
+  router.get("/:id", requirePermission("offerings:read"), async (req, res) => {
+    const offering = await offeringService.getById(req.params.id!);
+    if (!offering) {
+      res.status(404).json({ error: "Offering not found" });
+      return;
+    }
+    res.json(offering);
+  });
+
+  router.post("/", requirePermission("offerings:write"), async (req, res) => {
+    const parsed = CreateOfferingInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.status(201).json(await offeringService.create(parsed.data));
+    } catch (err) {
+      handleError(err, res, "Could not create offering");
+    }
+  });
+
+  router.patch("/:id", requirePermission("offerings:write"), async (req, res) => {
+    const parsed = UpdateOfferingInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await offeringService.update(req.params.id!, parsed.data));
+    } catch (err) {
+      handleError(err, res, "Could not update offering");
+    }
+  });
+
+  router.delete("/:id", requirePermission("offerings:write"), async (req, res) => {
+    try {
+      await offeringService.remove(req.params.id!);
+      res.status(204).end();
+    } catch {
+      res.status(404).json({ error: "Offering not found" });
+    }
+  });
+
+  // Enrollment management (links Students <-> this offering).
+  router.post("/:id/enrollments", requirePermission("offerings:write"), async (req, res) => {
+    const parsed = EnrollInput.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.status(201).json(await offeringService.enroll(req.params.id!, parsed.data));
+    } catch (err) {
+      handleError(err, res, "Could not enroll students");
+    }
+  });
+
+  router.delete(
+    "/:id/enrollments/:studentId",
+    requirePermission("offerings:write"),
+    async (req, res) => {
+      try {
+        res.json(await offeringService.unenroll(req.params.id!, req.params.studentId!));
+      } catch (err) {
+        handleError(err, res, "Could not unenroll student");
+      }
+    },
+  );
+
+  return router;
+}
+
+function handleError(err: unknown, res: import("express").Response, fallback: string): void {
+  if (err instanceof ReferenceError) {
+    res.status(400).json({ error: err.message });
+    return;
+  }
+  if (err instanceof CapacityError) {
+    res.status(409).json({ error: err.message });
+    return;
+  }
+  const code = (err as { code?: string }).code;
+  if (code === "P2002") {
+    res.status(409).json({ error: "An offering for that course and term already exists" });
+    return;
+  }
+  if (code === "P2025") {
+    res.status(404).json({ error: "Offering not found" });
+    return;
+  }
+  res.status(409).json({ error: fallback });
+}

@@ -1,15 +1,17 @@
 import { PrismaClient } from "@prisma/client";
 
 /**
- * Seeds dev users (one per role) and a handful of students so the UI has data
- * on first run. Idempotent via upsert on unique fields.
+ * Seeds dev users (incl. several lecturers), students, courses, offerings and a
+ * few enrollments so every plugin has data on first run. Idempotent via upsert.
  */
 const prisma = new PrismaClient();
 
 const users = [
   { email: "admin@dse.dev", name: "Admin User", role: "admin" as const },
-  { email: "lecturer@dse.dev", name: "Lecturer User", role: "lecturer" as const },
   { email: "student@dse.dev", name: "Student User", role: "student" as const },
+  { email: "lecturer@dse.dev", name: "Dr. Rao", role: "lecturer" as const },
+  { email: "hopper.lecturer@dse.dev", name: "Prof. Hopper", role: "lecturer" as const },
+  { email: "knuth.lecturer@dse.dev", name: "Prof. Knuth", role: "lecturer" as const },
 ];
 
 const students = [
@@ -20,6 +22,12 @@ const students = [
   { name: "Edsger Dijkstra", email: "edsger@dse.dev", studentId: "DSE-0005", status: "Inactive" as const },
 ];
 
+const courses = [
+  { code: "CS101", title: "Introduction to Programming", description: "Fundamentals of programming.", lecturer: "lecturer@dse.dev" },
+  { code: "CS201", title: "Data Structures & Algorithms", description: "Core data structures.", lecturer: "knuth.lecturer@dse.dev" },
+  { code: "CS301", title: "Databases", description: "Relational databases and SQL.", lecturer: "hopper.lecturer@dse.dev" },
+];
+
 async function main() {
   for (const u of users) {
     await prisma.user.upsert({ where: { email: u.email }, update: u, create: u });
@@ -27,8 +35,46 @@ async function main() {
   for (const s of students) {
     await prisma.student.upsert({ where: { email: s.email }, update: s, create: s });
   }
+
+  for (const c of courses) {
+    const lecturer = await prisma.user.findUnique({ where: { email: c.lecturer } });
+    await prisma.course.upsert({
+      where: { code: c.code },
+      update: { title: c.title, description: c.description, lecturerId: lecturer?.id ?? null },
+      create: { code: c.code, title: c.title, description: c.description, lecturerId: lecturer?.id ?? null },
+    });
+  }
+
+  // One offering: CS101 in 2025-Fall, taught by its course lecturer, enrol 2 students.
+  const cs101 = await prisma.course.findUnique({ where: { code: "CS101" } });
+  if (cs101) {
+    const offering = await prisma.offering.upsert({
+      where: { courseId_term: { courseId: cs101.id, term: "2025-Fall" } },
+      update: { capacity: 30, status: "Active", lecturerId: cs101.lecturerId },
+      create: {
+        courseId: cs101.id,
+        term: "2025-Fall",
+        capacity: 30,
+        status: "Active",
+        lecturerId: cs101.lecturerId,
+      },
+    });
+    const enrolees = await prisma.student.findMany({
+      where: { email: { in: ["ada@dse.dev", "alan@dse.dev"] } },
+    });
+    for (const s of enrolees) {
+      await prisma.enrollment.upsert({
+        where: { offeringId_studentId: { offeringId: offering.id, studentId: s.id } },
+        update: {},
+        create: { offeringId: offering.id, studentId: s.id },
+      });
+    }
+  }
+
   // eslint-disable-next-line no-console
-  console.log(`Seeded ${users.length} users and ${students.length} students.`);
+  console.log(
+    `Seeded ${users.length} users, ${students.length} students, ${courses.length} courses, 1 offering with enrollments.`,
+  );
 }
 
 main()

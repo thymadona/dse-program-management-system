@@ -19,13 +19,23 @@ enum Role {
   student
 }
 
+enum OfferingStatus {
+  Planned
+  Active
+  Completed
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
+/// Lecturers are Users with role = lecturer, surfaced via the Lecturers plugin.
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
   name      String
   role      Role     @default(student)
   createdAt DateTime @default(now())
+
+  coursesLed   Course[]   @relation("CourseLecturer")
+  offeringsLed Offering[] @relation("OfferingLecturer")
 }
 
 /// Students plugin domain model.
@@ -37,5 +47,53 @@ model Student {
   status    StudentStatus @default(Active)
   createdAt DateTime      @default(now())
 
+  enrollments Enrollment[]
+
   @@index([status])
+}
+
+/// Courses plugin domain model. lecturerId references a User with role = lecturer
+/// (validated at the service layer through registry.get('lecturers')).
+model Course {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  title       String
+  description String?
+  lecturerId  String?
+  lecturer    User?    @relation("CourseLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  offerings Offering[]
+}
+
+/// Course Offerings plugin — a course delivered in a given term, with an assigned
+/// lecturer, a seat capacity, and enrolled students. The architectural proof point:
+/// it links Students <-> Courses <-> Lecturers through the registry.
+model Offering {
+  id         String         @id @default(uuid())
+  courseId   String
+  course     Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lecturerId String?
+  lecturer   User?          @relation("OfferingLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
+  term       String
+  capacity   Int            @default(30)
+  status     OfferingStatus @default(Planned)
+  createdAt  DateTime       @default(now())
+
+  enrollments Enrollment[]
+
+  @@unique([courseId, term])
+  @@index([status])
+}
+
+/// Join model linking a Student to an Offering (enrollment).
+model Enrollment {
+  id         String   @id @default(uuid())
+  offeringId String
+  offering   Offering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([offeringId, studentId])
 }
