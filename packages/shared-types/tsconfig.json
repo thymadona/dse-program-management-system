@@ -1,0 +1,7 @@
+{
+  "extends": "@dse-pms/config/tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StudentStatus {
+  Active
+  Inactive
+  Pending
+}
+
+enum Role {
+  admin
+  lecturer
+  student
+}
+
+/// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(student)
+  createdAt DateTime @default(now())
+}
+
+/// Students plugin domain model.
+model Student {
+  id        String        @id @default(uuid())
+  name      String
+  email     String        @unique
+  studentId String        @unique
+  status    StudentStatus @default(Active)
+  createdAt DateTime      @default(now())
+
+  @@index([status])
+}

@@ -1,0 +1,43 @@
+import { PrismaClient } from "@prisma/client";
+import { signToken, type Role } from "../src/core/auth/token.ts";
+
+/**
+ * Mints a dev JWT for a seeded user of the given role. Usage:
+ *   bun run gen-token --role admin
+ *   bun run gen-token             # defaults to admin
+ *
+ * Paste the printed token into apps/frontend/.env.local as NEXT_PUBLIC_DEV_TOKEN.
+ * This is a temporary stand-in for a real login flow (Supabase) later.
+ */
+const prisma = new PrismaClient();
+
+function parseRole(): Role {
+  const idx = process.argv.indexOf("--role");
+  const value = idx >= 0 ? process.argv[idx + 1] : "admin";
+  if (value !== "admin" && value !== "lecturer" && value !== "student") {
+    console.error(`Invalid role "${value}". Use one of: admin, lecturer, student`);
+    process.exit(1);
+  }
+  return value;
+}
+
+async function main() {
+  const role = parseRole();
+  const user = await prisma.user.findFirst({ where: { role } });
+  if (!user) {
+    console.error(`No seeded user with role "${role}". Run \`bun run seed\` first.`);
+    process.exit(1);
+  }
+  const token = signToken({ id: user.id, email: user.email, role });
+  // Print only the token on the last line so it's easy to copy/pipe.
+  console.error(`Token for ${user.email} (${role}), valid 7d:\n`);
+  console.log(token);
+}
+
+main()
+  .then(() => prisma.$disconnect())
+  .catch(async (err) => {
+    console.error(err);
+    await prisma.$disconnect();
+    process.exit(1);
+  });

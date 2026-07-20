@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/**
+ * Noviq design-system tokens as CSS variables, consumed by the shared Tailwind
+ * preset (packages/config/tailwind-preset.ts).
+ */
+:root {
+  --canvas: #f0f4f8;
+  --card: #ffffff;
+  --foreground: #102a30;
+
+  --sidebar: #102a30;
+  --sidebar-foreground: #e7edf0;
+  --sidebar-muted: #7c8f95;
+  --sidebar-active: #1c3d45;
+
+  --primary: #102a30;
+  --primary-foreground: #ffffff;
+
+  --accent: #cfe0f4; /* light blue */
+  --accent-foreground: #102a30;
+
+  --border: #e2e8f0;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+
+  /* Status tokens */
+  --status-live: #15a06a; /* green  — live/active/success */
+  --status-live-bg: #e6f6ee;
+  --status-upcoming: #e07b1a; /* orange — upcoming/pending */
+  --status-upcoming-bg: #fdf0e2;
+  --status-tournament: #8b5cf6; /* purple — tournament/category */
+  --status-tournament-bg: #f1ebfe;
+  --status-neutral: #64748b; /* gray — link/neutral */
+  --status-neutral-bg: #f1f5f9;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  background-color: var(--canvas);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}

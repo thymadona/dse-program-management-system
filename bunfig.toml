@@ -1,0 +1,4 @@
+[install]
+# Match the peer-dependency behaviour that the old .npmrc requested for pnpm.
+peer = true
+exact = false

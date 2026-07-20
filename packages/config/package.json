@@ -1,0 +1,14 @@
+{
+  "name": "@dse-pms/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tailwind-preset": "./tailwind-preset.ts"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.14"
+  }
+}
