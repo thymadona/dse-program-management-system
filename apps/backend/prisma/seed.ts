@@ -49,12 +49,31 @@ const courses = [
   { code: "CS301", title: "Databases", description: "Relational databases and SQL.", lecturer: "hopper.lecturer@dse.dev", credits: 3, prerequisites: "CS101; CS201", courseType: "Core" as const },
 ];
 
+const teachingMethods = [
+  "Lecture", "Guided Hands-on Lab", "Demonstration", "Lab-based Learning",
+  "Step-by-step Coding", "Scaffolded Exercises", "Tutoring", "Practice",
+  "Case Study", "Seminar", "Team-based Learning", "Project-Based Learning",
+  "Presentation", "Flipped Classroom", "Group Discussion",
+];
+
+const assessmentMethods = [
+  "Assignment", "Mid-term Quiz", "Final Exam", "Quiz", "Lab Report",
+  "Project", "Presentation & Defence", "Peer Review", "Reflection Journal",
+];
+
 async function main() {
   for (const u of users) {
     await prisma.user.upsert({ where: { email: u.email }, update: u, create: u });
   }
   for (const s of students) {
     await prisma.student.upsert({ where: { email: s.email }, update: s, create: s });
+  }
+
+  for (const name of teachingMethods) {
+    await prisma.teachingMethod.upsert({ where: { name }, update: {}, create: { name } });
+  }
+  for (const name of assessmentMethods) {
+    await prisma.assessmentMethod.upsert({ where: { name }, update: {}, create: { name } });
   }
 
   for (const c of courses) {
@@ -102,7 +121,8 @@ async function main() {
 
   // eslint-disable-next-line no-console
   console.log(
-    `Seeded ${users.length} users, ${students.length} students, ${courses.length} courses, 1 offering with enrollments.`,
+    `Seeded ${users.length} users, ${students.length} students, ${courses.length} courses, ` +
+      `${teachingMethods.length} teaching + ${assessmentMethods.length} assessment methods, 1 offering.`,
   );
 }
 

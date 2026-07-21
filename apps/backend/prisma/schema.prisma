@@ -143,3 +143,19 @@ model Enrollment {
 
   @@unique([offeringId, studentId])
 }
+
+/// §15 teaching-method vocabulary. Global and shared across all courses; grows
+/// as lecturers add methods from the course-spec form. Names are unique so an
+/// add of an existing name reuses the row.
+model TeachingMethod {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+/// §15 assessment-method vocabulary. Same lifecycle as TeachingMethod.
+model AssessmentMethod {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
