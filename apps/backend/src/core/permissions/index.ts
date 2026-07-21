@@ -16,6 +16,8 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "offerings:write",
     "lecturers:read",
     "lecturers:write",
+    "methods:read",
+    "methods:write",
   ],
   lecturer: [
     "students:read",
@@ -25,8 +27,10 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "offerings:write",
     "lecturers:read",
     "lecturers:write",
+    "methods:read",
+    "methods:write",
   ],
-  student: ["students:read", "courses:read", "offerings:read", "lecturers:read"],
+  student: ["students:read", "courses:read", "offerings:read", "lecturers:read", "methods:read"],
 };
 
 export function roleHasPermission(role: Role, permission: string): boolean {

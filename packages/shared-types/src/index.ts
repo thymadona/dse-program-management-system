@@ -6,3 +6,4 @@ export * from "./lecturers.ts";
 export * from "./courses.ts";
 export * from "./offerings.ts";
 export * from "./course-spec.ts";
+export * from "./methods.ts";

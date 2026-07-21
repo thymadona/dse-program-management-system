@@ -221,8 +221,8 @@ export const CloMappingItem = z.object({
   sltHours: z.coerce.number().int().min(0).max(1000).nullable().optional(),
   focus: FocusCode.nullable().optional(),
   focusPercent: z.coerce.number().int().min(0).max(100).nullable().optional(),
-  teachingMethod: z.string().optional(),
-  assessmentMethod: z.string().optional(),
+  teachingMethodIds: z.array(z.string()).default([]),
+  assessmentMethodIds: z.array(z.string()).default([]),
 });
 export type CloMappingItem = z.infer<typeof CloMappingItem>;
 

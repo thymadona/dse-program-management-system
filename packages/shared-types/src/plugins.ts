@@ -83,11 +83,20 @@ export const lecturersManifest: PluginManifest = {
   permissions: ["lecturers:read", "lecturers:write"],
 };
 
+export const methodsManifest: PluginManifest = {
+  id: "methods",
+  name: "Methods",
+  version: "0.1.0",
+  description: "Teaching & assessment method vocabulary for course specs (§15).",
+  permissions: ["methods:read", "methods:write"],
+};
+
 export const pluginManifests: PluginManifest[] = [
   studentsManifest,
   coursesManifest,
   offeringsManifest,
   lecturersManifest,
+  methodsManifest,
 ];
 
 /** Sidebar nav is generated automatically from plugin routes. */
