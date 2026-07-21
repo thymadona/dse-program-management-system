@@ -1,27 +1,36 @@
 "use client";
 
-import { FOCUS_LEVELS } from "@dse-pms/shared-types";
+import { FOCUS_LEVELS, type Method, type MethodKind } from "@dse-pms/shared-types";
 import { ReferenceGuide } from "./reference-guide";
+import { MethodChecklist } from "./method-checklist";
 import type { CloForm } from "./clos-section";
 
-/** A §15 mapping row held as strings for input binding. */
+/** A §15 mapping row held for input binding. */
 export type CloMappingForm = {
   cloCode: string;
   sltHours: string;
   focus: string;
   focusPercent: string;
-  teachingMethod: string;
-  assessmentMethod: string;
+  teachingMethodIds: string[];
+  assessmentMethodIds: string[];
 };
 
 function blankMapping(cloCode: string): CloMappingForm {
-  return { cloCode, sltHours: "", focus: "", focusPercent: "", teachingMethod: "", assessmentMethod: "" };
+  return {
+    cloCode,
+    sltHours: "",
+    focus: "",
+    focusPercent: "",
+    teachingMethodIds: [],
+    assessmentMethodIds: [],
+  };
 }
 
-/** Map the API's §15 payload into the string-based form model. */
+/** Map the API's §15 payload into the string/array-based form model. */
 export function toCloMappingForm(data: unknown): CloMappingForm[] {
   const items = (data as { items?: unknown[] } | undefined)?.items ?? [];
   const str = (v: unknown) => (v == null ? "" : String(v));
+  const ids = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
   return items.map((raw) => {
     const d = (raw ?? {}) as Record<string, unknown>;
     return {
@@ -29,8 +38,8 @@ export function toCloMappingForm(data: unknown): CloMappingForm[] {
       sltHours: str(d.sltHours),
       focus: str(d.focus),
       focusPercent: str(d.focusPercent),
-      teachingMethod: str(d.teachingMethod),
-      assessmentMethod: str(d.assessmentMethod),
+      teachingMethodIds: ids(d.teachingMethodIds),
+      assessmentMethodIds: ids(d.assessmentMethodIds),
     };
   });
 }
@@ -46,15 +55,14 @@ export function reconcileMapping(clos: CloForm[], saved: CloMappingForm[]): CloM
 
 /** Convert the reconciled rows into the CloMappingSection payload the API validates. */
 export function toCloMappingPayload(rows: CloMappingForm[]) {
-  const trimmed = (v: string) => (v.trim() ? v.trim() : undefined);
   return {
     items: rows.map((f) => ({
       cloCode: f.cloCode,
       sltHours: f.sltHours ? Number(f.sltHours) : null,
       focus: f.focus || null,
       focusPercent: f.focusPercent ? Number(f.focusPercent) : null,
-      teachingMethod: trimmed(f.teachingMethod),
-      assessmentMethod: trimmed(f.assessmentMethod),
+      teachingMethodIds: f.teachingMethodIds,
+      assessmentMethodIds: f.assessmentMethodIds,
     })),
   };
 }
@@ -63,10 +71,16 @@ export function CloMappingSection({
   clos,
   value,
   onChange,
+  teachingMethods,
+  assessmentMethods,
+  onAddMethod,
 }: {
   clos: CloForm[];
   value: CloMappingForm[];
   onChange: (rows: CloMappingForm[]) => void;
+  teachingMethods: Method[];
+  assessmentMethods: Method[];
+  onAddMethod: (kind: MethodKind, name: string) => Promise<Method>;
 }) {
   const rows = reconcileMapping(clos, value);
 
@@ -83,8 +97,7 @@ export function CloMappingSection({
     );
   }
 
-  const ploFor = (cloCode: string) => clos.find((c) => c.code === cloCode)?.ploId || "";
-  const levelFor = (cloCode: string) => clos.find((c) => c.code === cloCode)?.level || "";
+  const cloFor = (cloCode: string) => clos.find((c) => c.code === cloCode);
 
   return (
     <div className="space-y-5">
@@ -98,8 +111,9 @@ export function CloMappingSection({
 
       <div className="space-y-4">
         {rows.map((row, i) => {
-          const ploId = ploFor(row.cloCode);
-          const level = levelFor(row.cloCode);
+          const clo = cloFor(row.cloCode);
+          const ploId = clo?.ploId || "";
+          const level = clo?.level || "";
           return (
             <fieldset key={row.cloCode} className="space-y-3 rounded-lg border border-border p-4">
               <legend className="flex flex-wrap items-center gap-2 px-1">
@@ -109,6 +123,12 @@ export function CloMappingSection({
                   {level ? ` · ${level}` : ""}
                 </span>
               </legend>
+
+              {clo?.description ? (
+                <p className="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                  {clo.description}
+                </p>
+              ) : null}
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="block space-y-1.5">
@@ -151,25 +171,21 @@ export function CloMappingSection({
                 </label>
               </div>
 
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-foreground">Teaching method</span>
-                <textarea
-                  className="min-h-[56px] w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  placeholder="e.g. Lecture + Guided Hands-on Lab + Demonstration"
-                  value={row.teachingMethod}
-                  onChange={(e) => update(i, { teachingMethod: e.target.value })}
-                />
-              </label>
+              <MethodChecklist
+                label="Teaching method"
+                options={teachingMethods}
+                selectedIds={row.teachingMethodIds}
+                onChange={(ids) => update(i, { teachingMethodIds: ids })}
+                onAdd={(name) => onAddMethod("teaching", name)}
+              />
 
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-foreground">Assessment method</span>
-                <textarea
-                  className="min-h-[56px] w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                  placeholder="e.g. Assignment 1 (EDA & Data Cleaning), Mid-term Quiz"
-                  value={row.assessmentMethod}
-                  onChange={(e) => update(i, { assessmentMethod: e.target.value })}
-                />
-              </label>
+              <MethodChecklist
+                label="Assessment method"
+                options={assessmentMethods}
+                selectedIds={row.assessmentMethodIds}
+                onChange={(ids) => update(i, { assessmentMethodIds: ids })}
+                onAdd={(name) => onAddMethod("assessment", name)}
+              />
             </fieldset>
           );
         })}

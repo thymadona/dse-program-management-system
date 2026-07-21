@@ -2,10 +2,17 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { SPEC_SECTIONS, type SpecSectionId, type SpecSectionStatus } from "@dse-pms/shared-types";
+import {
+  SPEC_SECTIONS,
+  type Method,
+  type MethodKind,
+  type SpecSectionId,
+  type SpecSectionStatus,
+} from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
 import { courseSpecApi } from "@/lib/course-spec";
+import { methodsApi } from "@/lib/methods";
 import {
   CourseInfoSection,
   EMPTY_COURSE_INFO,
@@ -35,6 +42,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
   const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
+  const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
+  const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,12 +58,24 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setClos(toClosForm(spec.data.clos));
       setCloMapping(toCloMappingForm(spec.data.cloMapping));
       setStatus(spec.status ?? {});
+      const methods = await methodsApi.list();
+      setTeachingMethods(methods.teaching);
+      setAssessmentMethods(methods.assessment);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load the course specification");
     } finally {
       setLoading(false);
     }
   }, [courseId]);
+
+  const sortByName = (list: Method[]) => [...list].sort((a, b) => a.name.localeCompare(b.name));
+
+  const handleAddMethod = useCallback(async (kind: MethodKind, name: string): Promise<Method> => {
+    const method = await methodsApi.add(kind, name);
+    const setter = kind === "teaching" ? setTeachingMethods : setAssessmentMethods;
+    setter((list) => (list.some((m) => m.id === method.id) ? list : sortByName([...list, method])));
+    return method;
+  }, []);
 
   useEffect(() => {
     load();
@@ -172,7 +193,14 @@ export function SpecClient({ courseId }: { courseId: string }) {
           ) : activeId === "clos" ? (
             <ClosSection value={clos} onChange={setClos} />
           ) : activeId === "cloMapping" ? (
-            <CloMappingSection clos={clos} value={cloMapping} onChange={setCloMapping} />
+            <CloMappingSection
+              clos={clos}
+              value={cloMapping}
+              onChange={setCloMapping}
+              teachingMethods={teachingMethods}
+              assessmentMethods={assessmentMethods}
+              onAddMethod={handleAddMethod}
+            />
           ) : (
             <ComingSoon title={activeMeta?.title ?? ""} refLabel={activeMeta?.ref ?? ""} />
           )}
