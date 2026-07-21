@@ -9,5 +9,8 @@ dist/
 !.env.example
 !.env.local.example
 
+# Vercel
+.vercel/
+
 # macOS
 .DS_Store
