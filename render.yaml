@@ -5,7 +5,7 @@ services:
   - type: web
     name: dse-pms-backend
     runtime: docker
-    dockerfilePath: ./apps/backend/Dockerfile
+    dockerfilePath: ./Dockerfile
     dockerContext: .            # repo root, so workspace deps resolve
     plan: free
     healthCheckPath: /health

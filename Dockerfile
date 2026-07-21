@@ -1,6 +1,7 @@
 # DSE-PMS backend — runs the Express/Bun API on Render.
-# Build context is the REPO ROOT (see render.yaml) so bun can resolve the
-# workspace packages (@dse-pms/shared-types, etc.) and Prisma.
+# Lives at the repo root so the Docker build context is the whole monorepo,
+# letting bun resolve the workspace packages (@dse-pms/shared-types, etc.)
+# and Prisma. Render's default Dockerfile path (./Dockerfile) picks this up.
 FROM oven/bun:1.2.23
 
 WORKDIR /app
