@@ -1,5 +1,11 @@
 import { Router } from "express";
-import { CreateCourseInput, ListCoursesQuery, UpdateCourseInput } from "@dse-pms/shared-types";
+import {
+  CreateCourseInput,
+  ListCoursesQuery,
+  SPEC_SECTION_SCHEMAS,
+  UpdateCourseInput,
+  type SpecSectionId,
+} from "@dse-pms/shared-types";
 import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { courseService, ReferenceError } from "./service.ts";
@@ -58,6 +64,36 @@ export function createCourseRouter(): Router {
       res.status(204).end();
     } catch {
       res.status(404).json({ error: "Course not found" });
+    }
+  });
+
+  /* -------------------------------------------------- Course Specification */
+
+  router.get("/:id/spec", requirePermission("courses:read"), async (req, res) => {
+    const spec = await courseService.getSpec(req.params.id!);
+    if (!spec) {
+      res.status(404).json({ error: "Course not found" });
+      return;
+    }
+    res.json(spec);
+  });
+
+  router.put("/:id/spec/:sectionId", requirePermission("courses:write"), async (req, res) => {
+    const sectionId = req.params.sectionId as SpecSectionId;
+    const schema = SPEC_SECTION_SCHEMAS[sectionId];
+    if (!schema) {
+      res.status(400).json({ error: `Section "${sectionId}" cannot be saved yet` });
+      return;
+    }
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
+      return;
+    }
+    try {
+      res.json(await courseService.saveSection(req.params.id!, sectionId, parsed.data));
+    } catch (err) {
+      res.status(errStatus(err)).json({ error: errMessage(err, "code") ?? "Could not save section" });
     }
   });
 

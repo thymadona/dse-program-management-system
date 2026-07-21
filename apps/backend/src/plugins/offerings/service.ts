@@ -34,6 +34,9 @@ async function toView(offering: {
   term: string;
   capacity: number;
   status: OfferingView["status"];
+  semester: OfferingView["semester"];
+  programmeYear: number | null;
+  otherLecturers: string | null;
   createdAt: Date;
   enrollments: { studentId: string }[];
 }): Promise<OfferingView> {
@@ -48,10 +51,23 @@ async function toView(offering: {
     term: offering.term,
     status: offering.status,
     capacity: offering.capacity,
+    semester: offering.semester,
+    programmeYear: offering.programmeYear,
+    otherLecturers: offering.otherLecturers,
     enrolledCount: offering.enrollments.length,
     createdAt: offering.createdAt.toISOString(),
     course: course ? { id: course.id, code: course.code, title: course.title } : null,
-    lecturer: lecturer ? { id: lecturer.id, name: lecturer.name, email: lecturer.email } : null,
+    // Full instructor block for the syllabus Course Details (§6–9).
+    lecturer: lecturer
+      ? {
+          id: lecturer.id,
+          name: lecturer.name,
+          email: lecturer.email,
+          title: lecturer.title,
+          qualification: lecturer.qualification,
+          phone: lecturer.phone,
+        }
+      : null,
     students: enrolledStudents.map((s) => ({ id: s.id, name: s.name, studentId: s.studentId })),
   };
 }
@@ -91,6 +107,9 @@ export const offeringService = {
         lecturerId: input.lecturerId ?? null,
         capacity: input.capacity,
         status: input.status,
+        semester: input.semester ?? null,
+        programmeYear: input.programmeYear ?? null,
+        otherLecturers: input.otherLecturers ?? null,
       },
       include: withEnrollments,
     });
@@ -108,6 +127,9 @@ export const offeringService = {
         ...(input.lecturerId !== undefined ? { lecturerId: input.lecturerId } : {}),
         ...(input.capacity !== undefined ? { capacity: input.capacity } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.semester !== undefined ? { semester: input.semester } : {}),
+        ...(input.programmeYear !== undefined ? { programmeYear: input.programmeYear } : {}),
+        ...(input.otherLecturers !== undefined ? { otherLecturers: input.otherLecturers } : {}),
       },
       include: withEnrollments,
     });

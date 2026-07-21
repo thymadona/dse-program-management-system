@@ -1,12 +1,35 @@
 import { z } from "zod";
 
 /**
- * Lecturers are Users with role = lecturer, surfaced read-only via the Lecturers
- * plugin. Courses and Offerings consume this through registry.get('lecturers').
+ * Lecturers are Users with role = lecturer, surfaced via the Lecturers plugin.
+ * Courses and Offerings consume this through registry.get('lecturers').
+ *
+ * title / qualification / phone populate the syllabus "Course Details" block
+ * (§6–9) so an offering's syllabus can auto-fill instructor info.
  */
 export const LecturerSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   email: z.string().email(),
+  title: z.string().nullable().optional(),
+  qualification: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
 });
 export type Lecturer = z.infer<typeof LecturerSchema>;
+
+export const CreateLecturerInput = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("A valid email is required"),
+  title: z.string().optional(),
+  qualification: z.string().optional(),
+  phone: z.string().optional(),
+});
+export type CreateLecturerInput = z.infer<typeof CreateLecturerInput>;
+
+export const UpdateLecturerInput = CreateLecturerInput.partial();
+export type UpdateLecturerInput = z.infer<typeof UpdateLecturerInput>;
+
+export const ListLecturersQuery = z.object({
+  search: z.string().trim().optional(),
+});
+export type ListLecturersQuery = z.infer<typeof ListLecturersQuery>;

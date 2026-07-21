@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -8,6 +8,7 @@ import {
   OFFERING_STATUSES,
   type Lecturer,
   type OfferingView,
+  type Semester,
 } from "@dse-pms/shared-types";
 import type { CourseView } from "@/lib/courses";
 import {
@@ -27,7 +28,14 @@ export type OfferingFormValues = {
   lecturerId?: string | null;
   capacity: number;
   status: (typeof OFFERING_STATUSES)[number];
+  // §12 Course Availability — optional.
+  semester?: Semester | null;
+  programmeYear?: number | null;
+  // §10 Other Course Lecturer(s) — optional free text.
+  otherLecturers?: string;
 };
+
+const YEAR_OPTIONS = [1, 2, 3, 4] as const;
 
 interface OfferingFormProps {
   open: boolean;
@@ -57,8 +65,20 @@ export function OfferingForm({
     formState: { errors },
   } = useForm<OfferingFormValues>({
     resolver: zodResolver(CreateOfferingInput),
-    defaultValues: { courseId: "", term: "", lecturerId: UNASSIGNED, capacity: 30, status: "Planned" },
+    defaultValues: {
+      courseId: "",
+      term: "",
+      lecturerId: UNASSIGNED,
+      capacity: 30,
+      status: "Planned",
+      otherLecturers: "",
+    },
   });
+
+  // §12 Course Availability is kept in local state (plain selects) so an empty
+  // choice submits as null rather than tripping the shared input resolver.
+  const [semester, setSemester] = useState<string>("");
+  const [programmeYear, setProgrammeYear] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -70,9 +90,19 @@ export function OfferingForm({
               lecturerId: editing.lecturer?.id ?? UNASSIGNED,
               capacity: editing.capacity,
               status: editing.status,
+              otherLecturers: editing.otherLecturers ?? "",
             }
-          : { courseId: "", term: "", lecturerId: UNASSIGNED, capacity: 30, status: "Planned" },
+          : {
+              courseId: "",
+              term: "",
+              lecturerId: UNASSIGNED,
+              capacity: 30,
+              status: "Planned",
+              otherLecturers: "",
+            },
       );
+      setSemester(editing?.semester ?? "");
+      setProgrammeYear(editing?.programmeYear != null ? String(editing.programmeYear) : "");
     }
   }, [open, editing, reset]);
 
@@ -88,7 +118,13 @@ export function OfferingForm({
 
         <form
           onSubmit={handleSubmit(async (values) => {
-            await onSubmit({ ...values, lecturerId: values.lecturerId || null });
+            await onSubmit({
+              ...values,
+              lecturerId: values.lecturerId || null,
+              semester: (semester || null) as Semester | null,
+              programmeYear: programmeYear ? Number(programmeYear) : null,
+              otherLecturers: values.otherLecturers?.trim() || undefined,
+            });
           })}
           className="space-y-4"
         >
@@ -109,6 +145,33 @@ export function OfferingForm({
           <Field label="Term" error={errors.term?.message}>
             <Input placeholder="2025-Fall" {...register("term")} />
           </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Semester (§12)">
+              <select
+                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                value={semester}
+                onChange={(e) => setSemester(e.target.value)}
+              >
+                <option value="">— Not set —</option>
+                <option value="First">1st Semester</option>
+                <option value="Second">2nd Semester</option>
+              </select>
+            </Field>
+            <Field label="Year (§12)">
+              <select
+                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                value={programmeYear}
+                onChange={(e) => setProgrammeYear(e.target.value)}
+              >
+                <option value="">— Not set —</option>
+                {YEAR_OPTIONS.map((y) => (
+                  <option key={y} value={y}>
+                    Year {y}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Capacity" error={errors.capacity?.message}>
               <Input type="number" min={1} {...register("capacity", { valueAsNumber: true })} />
@@ -138,6 +201,9 @@ export function OfferingForm({
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="Other lecturer(s) (§10)" error={errors.otherLecturers?.message}>
+            <Input placeholder="Co-teachers this term (optional)" {...register("otherLecturers")} />
           </Field>
 
           <DialogFooter>

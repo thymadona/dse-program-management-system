@@ -78,9 +78,9 @@ export const lecturersManifest: PluginManifest = {
   id: "lecturers",
   name: "Lecturers",
   version: "0.1.0",
-  description: "Lecturers (read-only) — Users with the lecturer role.",
+  description: "Lecturers — Users with the lecturer role, incl. syllabus contact details.",
   routes: [{ label: "Lecturers", path: "/lecturers", icon: "presentation" }],
-  permissions: ["lecturers:read"],
+  permissions: ["lecturers:read", "lecturers:write"],
 };
 
 export const pluginManifests: PluginManifest[] = [

@@ -9,9 +9,30 @@ const prisma = new PrismaClient();
 const users = [
   { email: "admin@dse.dev", name: "Admin User", role: "admin" as const },
   { email: "student@dse.dev", name: "Student User", role: "student" as const },
-  { email: "lecturer@dse.dev", name: "Dr. Rao", role: "lecturer" as const },
-  { email: "hopper.lecturer@dse.dev", name: "Prof. Hopper", role: "lecturer" as const },
-  { email: "knuth.lecturer@dse.dev", name: "Prof. Knuth", role: "lecturer" as const },
+  {
+    email: "lecturer@dse.dev",
+    name: "Rao",
+    role: "lecturer" as const,
+    title: "Dr.",
+    qualification: "PhD in Computer Science",
+    phone: "096 1000 001",
+  },
+  {
+    email: "hopper.lecturer@dse.dev",
+    name: "Hopper",
+    role: "lecturer" as const,
+    title: "Prof.",
+    qualification: "PhD in Mathematics",
+    phone: "096 1000 002",
+  },
+  {
+    email: "knuth.lecturer@dse.dev",
+    name: "Knuth",
+    role: "lecturer" as const,
+    title: "Prof.",
+    qualification: "PhD in Computer Science",
+    phone: "096 1000 003",
+  },
 ];
 
 const students = [
@@ -23,9 +44,9 @@ const students = [
 ];
 
 const courses = [
-  { code: "CS101", title: "Introduction to Programming", description: "Fundamentals of programming.", lecturer: "lecturer@dse.dev" },
-  { code: "CS201", title: "Data Structures & Algorithms", description: "Core data structures.", lecturer: "knuth.lecturer@dse.dev" },
-  { code: "CS301", title: "Databases", description: "Relational databases and SQL.", lecturer: "hopper.lecturer@dse.dev" },
+  { code: "CS101", title: "Introduction to Programming", description: "Fundamentals of programming.", lecturer: "lecturer@dse.dev", credits: 3, prerequisites: null, courseType: "Basic" as const },
+  { code: "CS201", title: "Data Structures & Algorithms", description: "Core data structures.", lecturer: "knuth.lecturer@dse.dev", credits: 3, prerequisites: "CS101", courseType: "Core" as const },
+  { code: "CS301", title: "Databases", description: "Relational databases and SQL.", lecturer: "hopper.lecturer@dse.dev", credits: 3, prerequisites: "CS101; CS201", courseType: "Core" as const },
 ];
 
 async function main() {
@@ -38,10 +59,18 @@ async function main() {
 
   for (const c of courses) {
     const lecturer = await prisma.user.findUnique({ where: { email: c.lecturer } });
+    const courseData = {
+      title: c.title,
+      description: c.description,
+      lecturerId: lecturer?.id ?? null,
+      credits: c.credits,
+      prerequisites: c.prerequisites,
+      courseType: c.courseType,
+    };
     await prisma.course.upsert({
       where: { code: c.code },
-      update: { title: c.title, description: c.description, lecturerId: lecturer?.id ?? null },
-      create: { code: c.code, title: c.title, description: c.description, lecturerId: lecturer?.id ?? null },
+      update: courseData,
+      create: { code: c.code, ...courseData },
     });
   }
 
