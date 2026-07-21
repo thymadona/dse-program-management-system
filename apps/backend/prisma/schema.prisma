@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Debian 12 (oven/bun image) ships OpenSSL 3.0; pin the engine so Prisma
+  // doesn't misdetect and fall back to the incompatible 1.1.x binary.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

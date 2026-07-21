@@ -4,6 +4,9 @@
 # and Prisma. Render's default Dockerfile path (./Dockerfile) picks this up.
 FROM oven/bun:1.2.23
 
+# Prisma's engines need OpenSSL present so it detects the right libssl.
+RUN apt-get update -y && apt-get install -y openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Install all workspace deps from the root lockfile.
