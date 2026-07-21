@@ -53,17 +53,44 @@ export function reconcileMapping(clos: CloForm[], saved: CloMappingForm[]): CloM
   return clos.map((clo) => byCode.get(clo.code) ?? blankMapping(clo.code));
 }
 
-/** Convert the reconciled rows into the CloMappingSection payload the API validates. */
+/** Total SLT across the section: the sum of every CLO's SLT hours. */
+export function totalSlt(rows: CloMappingForm[]): number {
+  return rows.reduce((sum, r) => sum + (Number(r.sltHours) || 0), 0);
+}
+
+/** A CLO's share of the total SLT, as a whole percent. `null` when not yet computable. */
+export function focusPercentOf(sltHours: string, total: number): number | null {
+  const hours = Number(sltHours);
+  if (!total || !hours) return null;
+  return Math.round((hours / total) * 100);
+}
+
+/** F/M/P category derived from a focus percentage (§15 legend: F >50%, M 31–50%, P ≤30%). */
+export function focusCodeOf(percent: number | null): string {
+  if (percent == null) return "";
+  if (percent > 50) return "F";
+  if (percent >= 31) return "M";
+  return "P";
+}
+
+/**
+ * Convert the reconciled rows into the CloMappingSection payload the API validates.
+ * Focus % and its F/M/P category are derived from each CLO's share of the total SLT.
+ */
 export function toCloMappingPayload(rows: CloMappingForm[]) {
+  const total = totalSlt(rows);
   return {
-    items: rows.map((f) => ({
-      cloCode: f.cloCode,
-      sltHours: f.sltHours ? Number(f.sltHours) : null,
-      focus: f.focus || null,
-      focusPercent: f.focusPercent ? Number(f.focusPercent) : null,
-      teachingMethodIds: f.teachingMethodIds,
-      assessmentMethodIds: f.assessmentMethodIds,
-    })),
+    items: rows.map((f) => {
+      const percent = focusPercentOf(f.sltHours, total);
+      return {
+        cloCode: f.cloCode,
+        sltHours: f.sltHours ? Number(f.sltHours) : null,
+        focus: focusCodeOf(percent) || null,
+        focusPercent: percent,
+        teachingMethodIds: f.teachingMethodIds,
+        assessmentMethodIds: f.assessmentMethodIds,
+      };
+    }),
   };
 }
 
@@ -83,6 +110,7 @@ export function CloMappingSection({
   onAddMethod: (kind: MethodKind, name: string) => Promise<Method>;
 }) {
   const rows = reconcileMapping(clos, value);
+  const total = totalSlt(rows);
 
   const update = (index: number, patch: Partial<CloMappingForm>) => {
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -102,18 +130,26 @@ export function CloMappingSection({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        For each CLO, record the Student Learning Time spent on its PLO, how strongly it focuses on
-        that PLO, and the teaching and assessment methods used. The PLO and C/A/P level are carried
-        over from §14.
+        For each CLO, record the Student Learning Time spent on its PLO, plus the teaching and
+        assessment methods used. Focus % and its F/M/P category are calculated automatically from
+        each CLO&apos;s share of the total SLT. The PLO and C/A/P level are carried over from §14.
       </p>
 
       <ReferenceGuide title="Focus on PLO (F / M / P)" rows={[...FOCUS_LEVELS]} />
+
+      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
+        <span className="text-muted-foreground">Total SLT (sum of CLO hours)</span>
+        <span className="font-semibold text-foreground">{total} h</span>
+      </div>
 
       <div className="space-y-4">
         {rows.map((row, i) => {
           const clo = cloFor(row.cloCode);
           const ploId = clo?.ploId || "";
           const level = clo?.level || "";
+          const percent = focusPercentOf(row.sltHours, total);
+          const focusCode = focusCodeOf(percent);
+          const focusName = FOCUS_LEVELS.find((f) => f.code === focusCode)?.name;
           return (
             <fieldset key={row.cloCode} className="space-y-3 rounded-lg border border-border p-4">
               <legend className="flex flex-wrap items-center gap-2 px-1">
@@ -142,33 +178,24 @@ export function CloMappingSection({
                     onChange={(e) => update(i, { sltHours: e.target.value })}
                   />
                 </label>
-                <label className="block space-y-1.5">
-                  <span className="text-sm font-medium text-foreground">Focus</span>
-                  <select
-                    className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    value={row.focus}
-                    onChange={(e) => update(i, { focus: e.target.value })}
+                <div className="block space-y-1.5">
+                  <span className="text-sm font-medium text-foreground">Focus (auto)</span>
+                  <div
+                    className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
+                    title="Derived from this CLO's share of the total SLT"
                   >
-                    <option value="">— Not set —</option>
-                    {FOCUS_LEVELS.map((f) => (
-                      <option key={f.code} value={f.code}>
-                        {f.code} — {f.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="block space-y-1.5">
-                  <span className="text-sm font-medium text-foreground">Focus %</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    placeholder="e.g. 35"
-                    className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    value={row.focusPercent}
-                    onChange={(e) => update(i, { focusPercent: e.target.value })}
-                  />
-                </label>
+                    {focusCode ? `${focusCode} — ${focusName}` : "—"}
+                  </div>
+                </div>
+                <div className="block space-y-1.5">
+                  <span className="text-sm font-medium text-foreground">Focus % (auto)</span>
+                  <div
+                    className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
+                    title="This CLO's SLT hours ÷ total SLT"
+                  >
+                    {percent == null ? "—" : `${percent}%`}
+                  </div>
+                </div>
               </div>
 
               <MethodChecklist
