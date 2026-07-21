@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FileText } from "lucide-react";
 import type { Lecturer } from "@dse-pms/shared-types";
+import { courseTypeLabel } from "@dse-pms/shared-types";
 import { DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { coursesApi, type CourseView } from "@/lib/courses";
 import { lecturersApi } from "@/lib/lecturers";
@@ -9,6 +12,7 @@ import { ApiError } from "@/lib/api";
 import { CourseForm, type CourseFormValues } from "./course-form";
 
 export function CoursesClient() {
+  const router = useRouter();
   const [rows, setRows] = useState<CourseView[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +74,22 @@ export function CoursesClient() {
     { key: "code", header: "Code", render: (c) => <span className="font-medium">{c.code}</span> },
     { key: "title", header: "Title", render: (c) => c.title },
     {
+      key: "credits",
+      header: "Credits",
+      render: (c) =>
+        c.credits != null ? c.credits : <span className="text-muted-foreground">—</span>,
+    },
+    {
+      key: "courseType",
+      header: "Type",
+      render: (c) =>
+        c.courseType ? (
+          courseTypeLabel(c.courseType)
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
       key: "lecturer",
       header: "Lecturer",
       render: (c) =>
@@ -105,6 +125,14 @@ export function CoursesClient() {
         rows={rows}
         getRowId={(c) => c.id}
         dragHandle
+        actions={[
+          {
+            key: "syllabus",
+            label: "Syllabus",
+            icon: <FileText className="mr-1 h-3.5 w-3.5" />,
+            onClick: (c) => router.push(`/courses/${c.id}/spec`),
+          },
+        ]}
         onEdit={(c) => {
           setEditing(c);
           setFormOpen(true);

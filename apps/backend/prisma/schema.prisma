@@ -25,14 +25,33 @@ enum OfferingStatus {
   Completed
 }
 
+/// Syllabus §12 "Course Availability" — which semester the course is delivered in.
+enum Semester {
+  First
+  Second
+}
+
+/// Syllabus §11 "Course Type".
+enum CourseType {
+  Basic
+  Core
+  Elective
+  Specialization
+  MoeysHeip
+}
+
 /// Minimal user table for local dev auth. Replaced/augmented by Supabase Auth later.
 /// Lecturers are Users with role = lecturer, surfaced via the Lecturers plugin.
+/// title/qualification/phone feed the syllabus "Course Details" instructor block.
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  name      String
-  role      Role     @default(student)
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  email         String   @unique
+  name          String
+  role          Role     @default(student)
+  title         String?
+  qualification String?
+  phone         String?
+  createdAt     DateTime @default(now())
 
   coursesLed   Course[]   @relation("CourseLecturer")
   offeringsLed Offering[] @relation("OfferingLecturer")
@@ -61,9 +80,28 @@ model Course {
   description String?
   lecturerId  String?
   lecturer    User?    @relation("CourseLecturer", fields: [lecturerId], references: [id], onDelete: SetNull)
+  // Syllabus Course Information — §4 credits, §5 prerequisites (free text), §11 type.
+  credits       Int?
+  prerequisites String?
+  courseType    CourseType?
   createdAt   DateTime @default(now())
 
   offerings Offering[]
+  spec      CourseSpec?
+}
+
+/// Course Specification wizard — the full RUPP syllabus (Part 2 §1–25) captured as a
+/// single JSON document per course. `data` holds each section's content keyed by
+/// section id; `status` tracks per-section draft/complete so a lecturer can save one
+/// section and continue later. Overlapping §1–13 scalars are mirrored onto Course.
+model CourseSpec {
+  id        String   @id @default(uuid())
+  courseId  String   @unique
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  data      Json     @default("{}")
+  status    Json     @default("{}")
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 }
 
 /// Course Offerings plugin — a course delivered in a given term, with an assigned
@@ -78,6 +116,11 @@ model Offering {
   term       String
   capacity   Int            @default(30)
   status     OfferingStatus @default(Planned)
+  // Syllabus §12 Course Availability — optional, filled on the course spec form.
+  semester      Semester?
+  programmeYear Int?
+  // Syllabus §10 Other Course Lecturer(s) — optional free text, varies per term.
+  otherLecturers String?
   createdAt  DateTime       @default(now())
 
   enrollments Enrollment[]

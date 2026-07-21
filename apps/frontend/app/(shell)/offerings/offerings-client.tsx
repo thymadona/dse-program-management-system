@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Users } from "lucide-react";
 import type { Lecturer, OfferingView, Student } from "@dse-pms/shared-types";
+import { semesterLabel } from "@dse-pms/shared-types";
 import {
   DataTable,
   StatusBadge,
@@ -104,6 +105,20 @@ export function OfferingsClient() {
         ),
     },
     { key: "term", header: "Term", render: (o) => o.term },
+    {
+      key: "availability",
+      header: "Availability",
+      render: (o) =>
+        o.semester || o.programmeYear != null ? (
+          <span className="text-muted-foreground">
+            {o.programmeYear != null ? `Year ${o.programmeYear}` : ""}
+            {o.programmeYear != null && o.semester ? " · " : ""}
+            {o.semester ? semesterLabel(o.semester) : ""}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
     {
       key: "lecturer",
       header: "Lecturer",

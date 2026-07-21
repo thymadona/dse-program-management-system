@@ -1,10 +1,13 @@
 import type {
+  CourseInfoSection,
   CoursesServiceContract,
   CreateCourseInput,
   LecturersServiceContract,
   ListCoursesQuery,
+  SpecSectionId,
   UpdateCourseInput,
 } from "@dse-pms/shared-types";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../core/db/prisma.ts";
 import { registry } from "../../core/plugins/registry.ts";
 
@@ -75,6 +78,99 @@ export const courseService = {
   async remove(id: string) {
     return prisma.course.delete({ where: { id } });
   },
+
+  /* ---------------------------------------------------- Course Specification */
+
+  /**
+   * Return the full spec document for a course. If the Course Information section
+   * hasn't been saved yet, it is pre-filled (in memory, not persisted) from the
+   * existing course + lecturer + latest offering so the wizard opens populated.
+   */
+  async getSpec(courseId: string) {
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) return null;
+
+    const spec = await prisma.courseSpec.findUnique({ where: { courseId } });
+    const data = { ...((spec?.data as Record<string, unknown>) ?? {}) };
+    const status = { ...((spec?.status as Record<string, string>) ?? {}) };
+
+    if (!data.courseInfo) {
+      data.courseInfo = await buildCourseInfoPrefill(course);
+    }
+    return { courseId, data, status };
+  },
+
+  /**
+   * Upsert one section of the spec, marking it complete. For the Course Information
+   * section, the overlapping scalars are mirrored back onto the Course row so the
+   * courses list stays accurate.
+   */
+  async saveSection(courseId: string, sectionId: SpecSectionId, values: unknown) {
+    const course = await prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) throw new ReferenceError("Course not found");
+
+    if (sectionId === "courseInfo") {
+      const info = values as CourseInfoSection;
+      await prisma.course.update({
+        where: { id: courseId },
+        data: {
+          title: info.courseTitle,
+          code: info.courseCode,
+          description: info.description || null,
+          credits: info.credits ?? null,
+          prerequisites: info.prerequisites || null,
+          courseType: info.courseType ?? null,
+        },
+      });
+    }
+
+    const existing = await prisma.courseSpec.findUnique({ where: { courseId } });
+    const data = { ...((existing?.data as Record<string, unknown>) ?? {}), [sectionId]: values };
+    const status = { ...((existing?.status as Record<string, string>) ?? {}), [sectionId]: "complete" };
+
+    const jsonData = data as Prisma.InputJsonValue;
+    const jsonStatus = status as Prisma.InputJsonValue;
+    await prisma.courseSpec.upsert({
+      where: { courseId },
+      create: { courseId, data: jsonData, status: jsonStatus },
+      update: { data: jsonData, status: jsonStatus },
+    });
+    return { courseId, data, status };
+  },
 } satisfies CoursesServiceContract & Record<string, unknown>;
+
+/** Assemble a Course Information (§1–13) snapshot from existing course-related data. */
+async function buildCourseInfoPrefill(course: {
+  id: string;
+  title: string;
+  code: string;
+  description: string | null;
+  credits: number | null;
+  prerequisites: string | null;
+  courseType: string | null;
+  lecturerId: string | null;
+}): Promise<CourseInfoSection> {
+  const lecturer = course.lecturerId ? await lecturers().getById(course.lecturerId) : null;
+  const offering = await prisma.offering.findFirst({
+    where: { courseId: course.id },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return {
+    courseTitle: course.title,
+    courseCode: course.code,
+    credits: course.credits,
+    prerequisites: course.prerequisites ?? "",
+    courseType: (course.courseType as CourseInfoSection["courseType"]) ?? null,
+    description: course.description ?? "",
+    instructorName: lecturer?.name ?? "",
+    qualification: lecturer?.qualification ?? "",
+    email: lecturer?.email ?? "",
+    telephone: lecturer?.phone ?? "",
+    otherLecturers: offering?.otherLecturers ?? "",
+    semester: offering?.semester ?? null,
+    programmeYear: offering?.programmeYear ?? null,
+  };
+}
 
 export type CourseService = typeof courseService;

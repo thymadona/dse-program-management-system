@@ -15,6 +15,7 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "offerings:read",
     "offerings:write",
     "lecturers:read",
+    "lecturers:write",
   ],
   lecturer: [
     "students:read",
@@ -23,6 +24,7 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "offerings:read",
     "offerings:write",
     "lecturers:read",
+    "lecturers:write",
   ],
   student: ["students:read", "courses:read", "offerings:read", "lecturers:read"],
 };

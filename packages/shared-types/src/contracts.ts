@@ -30,6 +30,10 @@ export interface LecturerRef {
   id: string;
   name: string;
   email: string;
+  // Syllabus "Course Details" instructor block (§7 qualification, §9 phone).
+  title: string | null;
+  qualification: string | null;
+  phone: string | null;
 }
 
 export interface StudentsServiceContract {

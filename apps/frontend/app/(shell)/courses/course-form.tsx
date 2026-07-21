@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreateCourseInput, type Lecturer } from "@dse-pms/shared-types";
+import {
+  COURSE_TYPES,
+  CreateCourseInput,
+  courseTypeLabel,
+  type CourseType,
+  type Lecturer,
+} from "@dse-pms/shared-types";
 import {
   Button,
   Dialog,
@@ -21,6 +27,10 @@ export type CourseFormValues = {
   title: string;
   description?: string;
   lecturerId?: string | null;
+  // Syllabus Course Information — §4 credits, §5 prerequisites, §11 type.
+  credits?: number | null;
+  prerequisites?: string;
+  courseType?: CourseType | null;
 };
 
 interface CourseFormProps {
@@ -49,8 +59,13 @@ export function CourseForm({
     formState: { errors },
   } = useForm<CourseFormValues>({
     resolver: zodResolver(CreateCourseInput),
-    defaultValues: { code: "", title: "", description: "", lecturerId: UNASSIGNED },
+    defaultValues: { code: "", title: "", description: "", lecturerId: UNASSIGNED, prerequisites: "" },
   });
+
+  // Credits (§4) and course type (§11) live in local state so an empty choice
+  // submits as null rather than tripping the shared input resolver.
+  const [credits, setCredits] = useState<string>("");
+  const [courseType, setCourseType] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -61,9 +76,12 @@ export function CourseForm({
               title: editing.title,
               description: editing.description ?? "",
               lecturerId: editing.lecturerId ?? UNASSIGNED,
+              prerequisites: editing.prerequisites ?? "",
             }
-          : { code: "", title: "", description: "", lecturerId: UNASSIGNED },
+          : { code: "", title: "", description: "", lecturerId: UNASSIGNED, prerequisites: "" },
       );
+      setCredits(editing?.credits != null ? String(editing.credits) : "");
+      setCourseType(editing?.courseType ?? "");
     }
   }, [open, editing, reset]);
 
@@ -79,8 +97,14 @@ export function CourseForm({
 
         <form
           onSubmit={handleSubmit(async (values) => {
-            // Normalise "" (Unassigned) to null for the API.
-            await onSubmit({ ...values, lecturerId: values.lecturerId || null });
+            // Normalise "" (Unassigned / not set) to null for the API.
+            await onSubmit({
+              ...values,
+              lecturerId: values.lecturerId || null,
+              prerequisites: values.prerequisites?.trim() || undefined,
+              credits: credits ? Number(credits) : null,
+              courseType: (courseType || null) as CourseType | null,
+            });
           })}
           className="space-y-4"
         >
@@ -92,6 +116,38 @@ export function CourseForm({
           </Field>
           <Field label="Description" error={errors.description?.message}>
             <Input placeholder="Optional" {...register("description")} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Credits (§4)">
+              <Input
+                type="number"
+                min={1}
+                max={30}
+                placeholder="3"
+                value={credits}
+                onChange={(e) => setCredits(e.target.value)}
+              />
+            </Field>
+            <Field label="Course type (§11)">
+              <select
+                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                value={courseType}
+                onChange={(e) => setCourseType(e.target.value)}
+              >
+                <option value="">— Not set —</option>
+                {COURSE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {courseTypeLabel(t)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <Field label="Pre-requisites (§5)" error={errors.prerequisites?.message}>
+            <Input
+              placeholder="e.g. Math I–III; Statistics I–II (optional)"
+              {...register("prerequisites")}
+            />
           </Field>
           <Field label="Lecturer" error={errors.lecturerId?.message}>
             <select
