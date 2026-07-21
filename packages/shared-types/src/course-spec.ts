@@ -35,8 +35,8 @@ export interface SpecSectionMeta {
 export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
   { id: "programme", title: "Programme", ref: "Part 1", part: "Part 1", state: "ready" },
   { id: "courseInfo", title: "Course Information", ref: "§1–13", part: "Part 2", state: "ready" },
-  { id: "clos", title: "Course Learning Outcomes", ref: "§14", part: "Part 2", state: "soon" },
-  { id: "cloMapping", title: "CLO → PLO Mapping & Methods", ref: "§15", part: "Part 2", state: "soon" },
+  { id: "clos", title: "Course Learning Outcomes", ref: "§14", part: "Part 2", state: "ready" },
+  { id: "cloMapping", title: "CLO → PLO Mapping & Methods", ref: "§15", part: "Part 2", state: "ready" },
   { id: "slt", title: "Student Learning Time", ref: "§16", part: "Part 2", state: "soon" },
   { id: "assessmentPlan", title: "Course Assessment Plan", ref: "§17", part: "Part 2", state: "soon" },
   { id: "lessonPlan", title: "Course Outline & Lesson Plan", ref: "§18", part: "Part 2", state: "soon" },
@@ -126,6 +126,42 @@ export const LETTER_GRADES: readonly { grade: string; point: string; score: stri
   { grade: "F", point: "0.00", score: "<50", label: "Fail" },
 ] as const;
 
+/** The ten programme learning outcomes (Part 1). Referenced by CLOs in §14/§15. */
+export const PLOS: readonly { id: string; description: string }[] = [
+  { id: "PLO1", description: "Apply knowledge in data science and engineering to develop appropriate solutions for real-world problems." },
+  { id: "PLO2", description: "Analyze data-related problems using logical reasoning and systems thinking." },
+  { id: "PLO3", description: "Utilize data science tools and technologies to develop technical solutions for practical applications." },
+  { id: "PLO4", description: "Participate effectively in multicultural and multidisciplinary teams with intercultural competence and responsible citizenship." },
+  { id: "PLO5", description: "Demonstrate leadership, accountability, and lifelong learning in professional practice." },
+  { id: "PLO6", description: "Develop innovative and entrepreneurial data-driven solutions that support national development and cultural sustainability in Cambodia and the ASEAN region." },
+  { id: "PLO7", description: "Make ethical decisions that reflect professional responsibility and awareness of social, cultural and environmental impacts." },
+  { id: "PLO8", description: "Communicate ideas and findings clearly through oral, written, and visual form." },
+  { id: "PLO9", description: "Utilize digital technologies and platforms to support communication, collaboration, and data-driven work." },
+  { id: "PLO10", description: "Apply mathematical, logical, and statistical reasoning in data analysis and problem solving." },
+] as const;
+
+export const PLO_IDS = ["PLO1", "PLO2", "PLO3", "PLO4", "PLO5", "PLO6", "PLO7", "PLO8", "PLO9", "PLO10"] as const;
+export const PloId = z.enum(PLO_IDS);
+export type PloId = z.infer<typeof PloId>;
+
+/** Every C/A/P Bloom level, flattened — drives the §14/§15 "C/A/P Level" dropdown. */
+export const CAP_LEVELS: readonly LevelGuideEntry[] = [
+  ...COGNITIVE_LEVELS,
+  ...AFFECTIVE_LEVELS,
+  ...PSYCHOMOTOR_LEVELS,
+] as const;
+
+const CAP_LEVEL_CODES = new Set(CAP_LEVELS.map((l) => l.code));
+
+/** A single Bloom level code (C1–C6, A1–A5, P1–P7), validated against CAP_LEVELS. */
+export const CapLevel = z
+  .string()
+  .refine((v) => CAP_LEVEL_CODES.has(v), { message: "Unknown C/A/P level" });
+
+/** §15 focus code (F/M/P) relative to total SLT on a PLO. */
+export const FocusCode = z.enum(["F", "M", "P"]);
+export type FocusCode = z.infer<typeof FocusCode>;
+
 /* -------------------------------------------- §1–13 Course Information */
 
 /**
@@ -155,9 +191,51 @@ export const CourseInfoSection = z.object({
 });
 export type CourseInfoSection = z.infer<typeof CourseInfoSection>;
 
+/* --------------------------------------- §14 Course Learning Outcomes */
+
+/**
+ * One Course Learning Outcome (§14). `code` (CLO1, CLO2…) is assigned by position.
+ * Each CLO targets a single primary PLO and sits at one C/A/P Bloom level.
+ */
+export const CloItem = z.object({
+  code: z.string().min(1),
+  description: z.string().min(1, "Describe what students will be able to do"),
+  ploId: PloId.nullable().optional(),
+  level: CapLevel.nullable().optional(),
+});
+export type CloItem = z.infer<typeof CloItem>;
+
+export const ClosSection = z.object({
+  items: z.array(CloItem),
+});
+export type ClosSection = z.infer<typeof ClosSection>;
+
+/* ------------------- §15 CLO → PLO mapping, teaching & assessment methods */
+
+/**
+ * One CLO's §15 mapping row: SLT hours + focus on its PLO, plus teaching and
+ * assessment methods. `cloCode` references a CLO defined in §14.
+ */
+export const CloMappingItem = z.object({
+  cloCode: z.string().min(1),
+  sltHours: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+  focus: FocusCode.nullable().optional(),
+  focusPercent: z.coerce.number().int().min(0).max(100).nullable().optional(),
+  teachingMethod: z.string().optional(),
+  assessmentMethod: z.string().optional(),
+});
+export type CloMappingItem = z.infer<typeof CloMappingItem>;
+
+export const CloMappingSection = z.object({
+  items: z.array(CloMappingItem),
+});
+export type CloMappingSection = z.infer<typeof CloMappingSection>;
+
 /** Zod schema for a given section id. Extend as later phases add sections. */
 export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
   courseInfo: CourseInfoSection,
+  clos: ClosSection,
+  cloMapping: CloMappingSection,
 };
 
 /* ------------------------------------------------------------- spec envelope */

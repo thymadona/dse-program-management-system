@@ -13,12 +13,28 @@ import {
   toCourseInfoPayload,
   type CourseInfoForm,
 } from "./course-info-section";
+import {
+  ClosSection,
+  EMPTY_CLOS,
+  toClosForm,
+  toClosPayload,
+  type CloForm,
+} from "./clos-section";
+import {
+  CloMappingSection,
+  reconcileMapping,
+  toCloMappingForm,
+  toCloMappingPayload,
+  type CloMappingForm,
+} from "./clo-mapping-section";
 import { ProgrammeSection } from "./programme-section";
 
 export function SpecClient({ courseId }: { courseId: string }) {
   const [activeId, setActiveId] = useState<SpecSectionId>("courseInfo");
   const [status, setStatus] = useState<Record<string, SpecSectionStatus>>({});
   const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
+  const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
+  const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +46,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
     try {
       const spec = await courseSpecApi.get(courseId);
       setCourseInfo(toCourseInfoForm(spec.data.courseInfo as Record<string, unknown> | undefined));
+      setClos(toClosForm(spec.data.clos));
+      setCloMapping(toCloMappingForm(spec.data.cloMapping));
       setStatus(spec.status ?? {});
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load the course specification");
@@ -58,6 +76,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
     try {
       if (activeId === "courseInfo") {
         await courseSpecApi.saveSection(courseId, "courseInfo", toCourseInfoPayload(courseInfo));
+      } else if (activeId === "clos") {
+        await courseSpecApi.saveSection(courseId, "clos", toClosPayload(clos));
+      } else if (activeId === "cloMapping") {
+        const reconciled = reconcileMapping(clos, cloMapping);
+        setCloMapping(reconciled);
+        await courseSpecApi.saveSection(courseId, "cloMapping", toCloMappingPayload(reconciled));
       }
       setStatus((s) => ({ ...s, [activeId]: "complete" }));
       setSavedFlash(true);
@@ -145,6 +169,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
               value={courseInfo}
               onChange={(patch) => setCourseInfo((v) => ({ ...v, ...patch }))}
             />
+          ) : activeId === "clos" ? (
+            <ClosSection value={clos} onChange={setClos} />
+          ) : activeId === "cloMapping" ? (
+            <CloMappingSection clos={clos} value={cloMapping} onChange={setCloMapping} />
           ) : (
             <ComingSoon title={activeMeta?.title ?? ""} refLabel={activeMeta?.ref ?? ""} />
           )}
