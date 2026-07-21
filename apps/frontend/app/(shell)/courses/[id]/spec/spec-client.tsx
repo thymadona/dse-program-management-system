@@ -53,12 +53,14 @@ export function SpecClient({ courseId }: { courseId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const spec = await courseSpecApi.get(courseId);
+      const [spec, methods] = await Promise.all([
+        courseSpecApi.get(courseId),
+        methodsApi.list(),
+      ]);
       setCourseInfo(toCourseInfoForm(spec.data.courseInfo as Record<string, unknown> | undefined));
       setClos(toClosForm(spec.data.clos));
       setCloMapping(toCloMappingForm(spec.data.cloMapping));
       setStatus(spec.status ?? {});
-      const methods = await methodsApi.list();
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
     } catch (err) {

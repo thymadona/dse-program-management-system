@@ -18,18 +18,30 @@ export const methodService = {
 
   async addTeaching(input: CreateMethodInput): Promise<{ method: Method; created: boolean }> {
     const select = { id: true, name: true } as const;
-    const existing = await prisma.teachingMethod.findUnique({ where: { name: input.name }, select });
-    if (existing) return { method: existing, created: false };
-    const method = await prisma.teachingMethod.create({ data: { name: input.name }, select });
-    return { method, created: true };
+    try {
+      const method = await prisma.teachingMethod.create({ data: { name: input.name }, select });
+      return { method, created: true };
+    } catch (err) {
+      if ((err as { code?: string }).code === "P2002") {
+        const existing = await prisma.teachingMethod.findUnique({ where: { name: input.name }, select });
+        if (existing) return { method: existing, created: false };
+      }
+      throw err;
+    }
   },
 
   async addAssessment(input: CreateMethodInput): Promise<{ method: Method; created: boolean }> {
     const select = { id: true, name: true } as const;
-    const existing = await prisma.assessmentMethod.findUnique({ where: { name: input.name }, select });
-    if (existing) return { method: existing, created: false };
-    const method = await prisma.assessmentMethod.create({ data: { name: input.name }, select });
-    return { method, created: true };
+    try {
+      const method = await prisma.assessmentMethod.create({ data: { name: input.name }, select });
+      return { method, created: true };
+    } catch (err) {
+      if ((err as { code?: string }).code === "P2002") {
+        const existing = await prisma.assessmentMethod.findUnique({ where: { name: input.name }, select });
+        if (existing) return { method: existing, created: false };
+      }
+      throw err;
+    }
   },
 };
 

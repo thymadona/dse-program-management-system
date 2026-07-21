@@ -22,8 +22,12 @@ export function createMethodRouter(): Router {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
       return;
     }
-    const { method, created } = await methodService.addTeaching(parsed.data);
-    res.status(created ? 201 : 200).json(method);
+    try {
+      const { method, created } = await methodService.addTeaching(parsed.data);
+      res.status(created ? 201 : 200).json(method);
+    } catch {
+      res.status(500).json({ error: "Could not add method" });
+    }
   });
 
   router.post("/assessment", requirePermission("methods:write"), async (req, res) => {
@@ -32,8 +36,12 @@ export function createMethodRouter(): Router {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
       return;
     }
-    const { method, created } = await methodService.addAssessment(parsed.data);
-    res.status(created ? 201 : 200).json(method);
+    try {
+      const { method, created } = await methodService.addAssessment(parsed.data);
+      res.status(created ? 201 : 200).json(method);
+    } catch {
+      res.status(500).json({ error: "Could not add method" });
+    }
   });
 
   return router;
