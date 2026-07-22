@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  perCloSlt,
   SPEC_SECTIONS,
   type Method,
   type MethodKind,
@@ -101,6 +102,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const next = SPEC_SECTIONS[activeIndex + 1];
   const canSave = activeMeta?.state === "ready" && activeId !== "programme";
 
+  const sltByClo = useMemo(() => perCloSlt(toSltPayload(slt).content), [slt]);
+
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
@@ -113,7 +116,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       } else if (activeId === "cloMapping") {
         const reconciled = reconcileMapping(clos, cloMapping);
         setCloMapping(reconciled);
-        await courseSpecApi.saveSection(courseId, "cloMapping", toCloMappingPayload(reconciled));
+        await courseSpecApi.saveSection(courseId, "cloMapping", toCloMappingPayload(reconciled, sltByClo));
       } else if (activeId === "slt") {
         await courseSpecApi.saveSection(courseId, "slt", toSltPayload(slt));
       }
@@ -213,6 +216,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               teachingMethods={teachingMethods}
               assessmentMethods={assessmentMethods}
               onAddMethod={handleAddMethod}
+              sltByClo={sltByClo}
             />
           ) : activeId === "slt" ? (
             <SltSectionForm value={slt} onChange={setSlt} clos={clos} />
