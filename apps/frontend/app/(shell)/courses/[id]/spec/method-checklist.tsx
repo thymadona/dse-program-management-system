@@ -1,28 +1,22 @@
 "use client";
 
-import { useState } from "react";
 import type { Method } from "@dse-pms/shared-types";
 
 /**
  * A multi-select checkbox list for a §15 method field. Shows a ticked-count
- * badge, one checkbox per known method, and an inline "+ Add method" input that
- * persists a new method (via onAdd) and ticks it.
+ * badge and one checkbox per known method.
  */
 export function MethodChecklist({
   label,
   options,
   selectedIds,
   onChange,
-  onAdd,
 }: {
   label: string;
   options: Method[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
-  onAdd: (name: string) => Promise<Method>;
 }) {
-  const [draft, setDraft] = useState("");
-  const [adding, setAdding] = useState(false);
   const selected = new Set(selectedIds);
 
   const toggle = (id: string) => {
@@ -30,19 +24,6 @@ export function MethodChecklist({
     if (next.has(id)) next.delete(id);
     else next.add(id);
     onChange([...next]);
-  };
-
-  const add = async () => {
-    const name = draft.trim();
-    if (!name || adding) return;
-    setAdding(true);
-    try {
-      const method = await onAdd(name);
-      if (!selected.has(method.id)) onChange([...selectedIds, method.id]);
-      setDraft("");
-    } finally {
-      setAdding(false);
-    }
   };
 
   return (
@@ -64,29 +45,6 @@ export function MethodChecklist({
             </label>
           </li>
         ))}
-        <li className="flex items-center gap-2 pt-1">
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                add();
-              }
-            }}
-            placeholder="+ Add method"
-            className="h-8 flex-1 rounded-lg border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          />
-          <button
-            type="button"
-            onClick={add}
-            disabled={!draft.trim() || adding}
-            className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
-          >
-            {adding ? "Adding…" : "Add"}
-          </button>
-        </li>
       </ul>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { FOCUS_LEVELS, type Method, type MethodKind } from "@dse-pms/shared-types";
+import { FOCUS_LEVELS, type Method } from "@dse-pms/shared-types";
 import { ReferenceGuide } from "./reference-guide";
 import { MethodChecklist } from "./method-checklist";
 import type { CloForm } from "./clos-section";
@@ -104,7 +104,6 @@ export function CloMappingSection({
   onChange,
   teachingMethods,
   assessmentMethods,
-  onAddMethod,
   sltByClo,
 }: {
   clos: CloForm[];
@@ -112,7 +111,6 @@ export function CloMappingSection({
   onChange: (rows: CloMappingForm[]) => void;
   teachingMethods: Method[];
   assessmentMethods: Method[];
-  onAddMethod: (kind: MethodKind, name: string) => Promise<Method>;
   sltByClo?: Record<string, number>;
 }) {
   const rows = reconcileMapping(clos, value);
@@ -222,7 +220,6 @@ export function CloMappingSection({
                 options={teachingMethods}
                 selectedIds={row.teachingMethodIds}
                 onChange={(ids) => update(i, { teachingMethodIds: ids })}
-                onAdd={(name) => onAddMethod("teaching", name)}
               />
 
               <MethodChecklist
@@ -230,7 +227,6 @@ export function CloMappingSection({
                 options={assessmentMethods}
                 selectedIds={row.assessmentMethodIds}
                 onChange={(ids) => update(i, { assessmentMethodIds: ids })}
-                onAdd={(name) => onAddMethod("assessment", name)}
               />
             </fieldset>
           );

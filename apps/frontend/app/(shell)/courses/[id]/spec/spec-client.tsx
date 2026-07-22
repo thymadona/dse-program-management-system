@@ -6,7 +6,6 @@ import {
   perCloSlt,
   SPEC_SECTIONS,
   type Method,
-  type MethodKind,
   type SpecSectionId,
   type SpecSectionStatus,
 } from "@dse-pms/shared-types";
@@ -79,15 +78,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setLoading(false);
     }
   }, [courseId]);
-
-  const sortByName = (list: Method[]) => [...list].sort((a, b) => a.name.localeCompare(b.name));
-
-  const handleAddMethod = useCallback(async (kind: MethodKind, name: string): Promise<Method> => {
-    const method = await methodsApi.add(kind, name);
-    const setter = kind === "teaching" ? setTeachingMethods : setAssessmentMethods;
-    setter((list) => (list.some((m) => m.id === method.id) ? list : sortByName([...list, method])));
-    return method;
-  }, []);
 
   useEffect(() => {
     load();
@@ -215,7 +205,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
               onChange={setCloMapping}
               teachingMethods={teachingMethods}
               assessmentMethods={assessmentMethods}
-              onAddMethod={handleAddMethod}
               sltByClo={sltByClo}
             />
           ) : activeId === "slt" ? (
