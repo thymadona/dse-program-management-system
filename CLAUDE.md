@@ -117,6 +117,12 @@ each plugin gets a route segment there. The course spec wizard lives under
 `students.ts`, `course-spec.ts`) wraps `lib/api.ts` with typed calls built on the
 shared Zod schemas — this is the layer to extend when a plugin gains new endpoints.
 
+Runs on **Next.js 16 / React 19** with Turbopack (`next.config.mjs` pins the
+monorepo `root` so an unrelated parent-dir lockfile can't confuse it). Consequently
+route `params`/`searchParams` are **async** — a page/layout must be `async` and
+`await params` before reading it (see `courses/[id]/spec/page.tsx`); the old
+synchronous `{ params }: { params: { id } }` shape no longer works.
+
 ### Spec-driven development workflow
 
 Feature work in this repo follows the `superpowers` skill's spec → plan → tasks

@@ -15,6 +15,7 @@ const preset = {
     extend: {
       colors: {
         canvas: "var(--canvas)", // page background  #F0F4F8
+        background: "var(--background)", // shadcn alias for canvas
         card: "var(--card)", //     card background  #FFFFFF
         sidebar: {
           DEFAULT: "var(--sidebar)", //   #102A30
@@ -31,9 +32,23 @@ const preset = {
           foreground: "var(--accent-foreground)",
         },
         border: "var(--border)",
+        input: "var(--input)",
+        ring: "var(--ring)",
         muted: {
           DEFAULT: "var(--muted)",
           foreground: "var(--muted-foreground)",
+        },
+        secondary: {
+          DEFAULT: "var(--secondary)",
+          foreground: "var(--secondary-foreground)",
+        },
+        popover: {
+          DEFAULT: "var(--popover)",
+          foreground: "var(--popover-foreground)",
+        },
+        destructive: {
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
         },
         foreground: "var(--foreground)",
         // Semantic status tokens
