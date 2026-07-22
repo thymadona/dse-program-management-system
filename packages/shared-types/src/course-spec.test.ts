@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CloMappingItem, SltSection, SPEC_SECTION_SCHEMAS, rowTotal, perCloSlt, sltSectionTotals } from "./course-spec.ts";
+import { CloMappingItem, SltSection, SPEC_SECTION_SCHEMAS, rowTotal, modeHoursTotal, perCloSlt, sltSectionTotals } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
 test("CloMappingItem defaults method id arrays to []", () => {
@@ -48,10 +48,19 @@ test("SltSection rejects hour cells out of range", () => {
   expect(SltSection.safeParse(bad).success).toBe(false);
 });
 
+test("SltAssessmentRow uses per-mode hours (no L/T/P/O) and coerces them", () => {
+  const parsed = SltSection.parse({
+    continuous: [{ id: "a1", title: "Quiz", weight: 20, hours: { physical: "2", independent: "8" } }],
+  });
+  expect(parsed.continuous[0]!.hours.physical).toBe(2);
+  expect(parsed.continuous[0]!.hours.independent).toBe(8);
+  expect(modeHoursTotal(parsed.continuous[0]!.hours)).toBe(10);
+});
+
 test("SltAssessmentRow weight is optional and bounded 0-100", () => {
-  const ok = SltSection.parse({ final: [{ id: "a1", title: "Report", weight: 40, cells: emptyCells }] });
+  const ok = SltSection.parse({ final: [{ id: "a1", title: "Report", weight: 40, hours: {} }] });
   expect(ok.final[0]!.weight).toBe(40);
-  const bad = { final: [{ id: "a1", title: "Report", weight: 101, cells: emptyCells }] };
+  const bad = { final: [{ id: "a1", title: "Report", weight: 101, hours: {} }] };
   expect(SltSection.safeParse(bad).success).toBe(false);
 });
 
@@ -81,8 +90,8 @@ test("perCloSlt groups content hours by cloCode and ignores rows without a CLO",
 test("sltSectionTotals cascades content, continuous, final into grand total", () => {
   const section = SltSection.parse({
     content: [{ id: "1", title: "A", cloCode: "CLO1", cells: { physical: { L: 10 } } }],
-    continuous: [{ id: "c1", title: "Quiz", weight: 20, cells: { independent: { O: 4 } } }],
-    final: [{ id: "f1", title: "Report", weight: 40, cells: { independent: { O: 6 } } }],
+    continuous: [{ id: "c1", title: "Quiz", weight: 20, hours: { independent: 4 } }],
+    final: [{ id: "f1", title: "Report", weight: 40, hours: { independent: 6 } }],
   });
   expect(sltSectionTotals(section)).toEqual({
     contentTotal: 10, continuousTotal: 4, finalTotal: 6, assessmentTotal: 10, grandTotal: 20,

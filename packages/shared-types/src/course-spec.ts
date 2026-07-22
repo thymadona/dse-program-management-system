@@ -250,6 +250,15 @@ export const SltCells = z
   .default({ physical: {}, online: {}, independent: {} });
 export type SltCells = z.infer<typeof SltCells>;
 
+/**
+ * Assessment rows carry hours per delivery mode only — no L/T/P/O activity
+ * breakdown (per the RUPP §16 assessment tables). Absent = 0.
+ */
+export const SltModeHours = z
+  .object({ physical: SltHour, online: SltHour, independent: SltHour })
+  .partial();
+export type SltModeHours = z.infer<typeof SltModeHours>;
+
 /** A §16 course-content topic row. `cloCode` references a §14 CLO. */
 export const SltTopicRow = z.object({
   id: z.string().min(1),
@@ -259,12 +268,15 @@ export const SltTopicRow = z.object({
 });
 export type SltTopicRow = z.infer<typeof SltTopicRow>;
 
-/** A §16 assessment row (continuous or final). No CLO; carries a % weight. */
+/**
+ * A §16 assessment row (continuous or final). No CLO. `weight` (%) is derived
+ * from the row's share of total assessment SLT. Hours are per delivery mode only.
+ */
 export const SltAssessmentRow = z.object({
   id: z.string().min(1),
   title: z.string().default(""),
   weight: z.coerce.number().int().min(0).max(100).nullable().default(null),
-  cells: SltCells,
+  hours: SltModeHours.default({}),
 });
 export type SltAssessmentRow = z.infer<typeof SltAssessmentRow>;
 
@@ -284,6 +296,11 @@ export function rowTotal(cells: SltCells): number {
   );
 }
 
+/** Sum an assessment row's per-mode hours (no L/T/P/O breakdown). */
+export function modeHoursTotal(hours: SltModeHours): number {
+  return (hours.physical ?? 0) + (hours.online ?? 0) + (hours.independent ?? 0);
+}
+
 /** Content-topic hours summed per CLO. Rows without a cloCode are ignored. */
 export function perCloSlt(content: SltTopicRow[]): Record<string, number> {
   const out: Record<string, number> = {};
@@ -296,11 +313,9 @@ export function perCloSlt(content: SltTopicRow[]): Record<string, number> {
 
 /** The §16 footer cascade: content + assessment totals → grand total. */
 export function sltSectionTotals(section: SltSection) {
-  const sum = (rows: { cells: SltCells }[]) =>
-    rows.reduce((s, r) => s + rowTotal(r.cells), 0);
-  const contentTotal = sum(section.content);
-  const continuousTotal = sum(section.continuous);
-  const finalTotal = sum(section.final);
+  const contentTotal = section.content.reduce((s, r) => s + rowTotal(r.cells), 0);
+  const continuousTotal = section.continuous.reduce((s, r) => s + modeHoursTotal(r.hours), 0);
+  const finalTotal = section.final.reduce((s, r) => s + modeHoursTotal(r.hours), 0);
   const assessmentTotal = continuousTotal + finalTotal;
   return {
     contentTotal,

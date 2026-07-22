@@ -2,7 +2,6 @@
 
 import {
   SLT_ACTIVITIES,
-  rowTotal,
   sltSectionTotals,
   type SltSection as SltSectionData,
 } from "@dse-pms/shared-types";
@@ -17,10 +16,12 @@ type ModeKey = (typeof MODES)[number]["key"];
 type ActCode = "L" | "T" | "P" | "O";
 const ACTS = SLT_ACTIVITIES.map((a) => a.code as ActCode);
 
-/** String-based cell grid for input binding: cells[mode][act] = "2". */
+/** Content cell grid for input binding: cells[mode][act] = "2" (L/T/P/O per mode). */
 export type CellForm = Record<ModeKey, Partial<Record<ActCode, string>>>;
+/** Assessment hours for input binding: one value per delivery mode, no L/T/P/O. */
+export type ModeHoursForm = Partial<Record<ModeKey, string>>;
 export type TopicRowForm = { id: string; title: string; cloCode: string; cells: CellForm };
-export type AssessmentRowForm = { id: string; title: string; cells: CellForm };
+export type AssessmentRowForm = { id: string; title: string; hours: ModeHoursForm };
 export type SltForm = {
   content: TopicRowForm[];
   continuous: AssessmentRowForm[];
@@ -32,7 +33,7 @@ export const EMPTY_SLT: SltForm = { content: [], continuous: [], final: [] };
 const blankCells = (): CellForm => ({ physical: {}, online: {}, independent: {} });
 const uuid = () => globalThis.crypto.randomUUID();
 export const blankTopic = (): TopicRowForm => ({ id: uuid(), title: "", cloCode: "", cells: blankCells() });
-export const blankAssessment = (): AssessmentRowForm => ({ id: uuid(), title: "", cells: blankCells() });
+export const blankAssessment = (): AssessmentRowForm => ({ id: uuid(), title: "", hours: {} });
 
 const str = (v: unknown) => (v == null ? "" : String(v));
 
@@ -48,6 +49,15 @@ function cellsToForm(raw: unknown): CellForm {
   return out;
 }
 
+function modeHoursToForm(raw: unknown): ModeHoursForm {
+  const d = (raw ?? {}) as Record<string, unknown>;
+  const out: ModeHoursForm = {};
+  for (const { key } of MODES) {
+    if (d[key] != null) out[key] = String(d[key]);
+  }
+  return out;
+}
+
 export function toSltForm(data: unknown): SltForm {
   const d = (data ?? {}) as Record<string, unknown[]>;
   const topics = (d.content ?? []).map((raw) => {
@@ -57,7 +67,7 @@ export function toSltForm(data: unknown): SltForm {
   const assess = (rows: unknown[] | undefined) =>
     (rows ?? []).map((raw) => {
       const r = (raw ?? {}) as Record<string, unknown>;
-      return { id: str(r.id) || uuid(), title: str(r.title), cells: cellsToForm(r.cells) };
+      return { id: str(r.id) || uuid(), title: str(r.title), hours: modeHoursToForm(r.hours) };
     });
   return { content: topics, continuous: assess(d.continuous), final: assess(d.final) };
 }
@@ -73,13 +83,22 @@ function cellsToPayload(cells: CellForm) {
   return out;
 }
 
+function modeHoursToPayload(hours: ModeHoursForm) {
+  const out: Record<string, number> = {};
+  for (const { key } of MODES) {
+    const v = hours[key];
+    if (v !== undefined && v !== "") out[key] = Number(v);
+  }
+  return out;
+}
+
 export function toSltPayload(form: SltForm): SltSectionData {
-  const assessmentTotal = [...form.continuous, ...form.final].reduce((s, r) => s + formRowTotal(r.cells), 0);
+  const assessmentTotal = [...form.continuous, ...form.final].reduce((s, r) => s + formModeTotal(r.hours), 0);
   const assess = (r: AssessmentRowForm) => ({
     id: r.id,
     title: r.title,
-    weight: assessmentWeight(r.cells, assessmentTotal),
-    cells: cellsToPayload(r.cells),
+    weight: assessmentWeight(r.hours, assessmentTotal),
+    hours: modeHoursToPayload(r.hours),
   });
   return {
     content: form.content.map((r) => ({ id: r.id, title: r.title, cloCode: r.cloCode || null, cells: cellsToPayload(r.cells) })),
@@ -88,11 +107,16 @@ export function toSltPayload(form: SltForm): SltSectionData {
   } as SltSectionData;
 }
 
-/** Numeric row total from the string form, for the live per-row Total column. */
+/** Numeric row total from a content row's string form (all modes × L/T/P/O). */
 function formRowTotal(cells: CellForm): number {
   let n = 0;
   for (const { key } of MODES) for (const act of ACTS) n += Number(cells[key][act] || 0);
   return n;
+}
+
+/** Numeric row total from an assessment row's per-mode string form. */
+function formModeTotal(hours: ModeHoursForm): number {
+  return MODES.reduce((n, { key }) => n + Number(hours[key] || 0), 0);
 }
 
 /**
@@ -100,9 +124,9 @@ function formRowTotal(cells: CellForm): number {
  * assessment SLT (continuous + final). `null` when there are no assessment hours yet.
  * Not user-editable — parallels §15's auto focus %.
  */
-function assessmentWeight(cells: CellForm, assessmentTotal: number): number | null {
+function assessmentWeight(hours: ModeHoursForm, assessmentTotal: number): number | null {
   if (!assessmentTotal) return null;
-  return Math.round((formRowTotal(cells) / assessmentTotal) * 100);
+  return Math.round((formModeTotal(hours) / assessmentTotal) * 100);
 }
 
 function reorder<T>(rows: T[], from: number, to: number): T[] {
@@ -115,6 +139,8 @@ function reorder<T>(rows: T[], from: number, to: number): T[] {
 
 const inputCls =
   "h-8 w-12 rounded border border-border bg-card px-1 text-center text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
+const titleInputCls =
+  "h-8 w-56 rounded border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
 function CellInputs({ cells, onCell }: { cells: CellForm; onCell: (mode: ModeKey, act: ActCode, v: string) => void }) {
   return (
@@ -136,11 +162,30 @@ function CellInputs({ cells, onCell }: { cells: CellForm; onCell: (mode: ModeKey
   );
 }
 
-function GridHead({ leadCols }: { leadCols: string[] }) {
+function ModeInputs({ hours, onMode }: { hours: ModeHoursForm; onMode: (mode: ModeKey, v: string) => void }) {
+  return (
+    <>
+      {MODES.map(({ key }) => (
+        <td key={key} className="px-1 py-1 text-center">
+          <input
+            type="number"
+            min={0}
+            className={inputCls}
+            value={hours[key] ?? ""}
+            onChange={(e) => onMode(key, e.target.value)}
+          />
+        </td>
+      ))}
+    </>
+  );
+}
+
+/** Content-table header: two rows — mode groups spanning L/T/P/O. */
+function ContentHead() {
   return (
     <thead>
       <tr className="text-xs text-muted-foreground">
-        {leadCols.map((c) => (
+        {["Topic", "CLO"].map((c) => (
           <th key={c} rowSpan={2} className="px-2 py-1 text-left align-bottom">{c}</th>
         ))}
         {MODES.map((m) => (
@@ -151,6 +196,23 @@ function GridHead({ leadCols }: { leadCols: string[] }) {
       </tr>
       <tr className="text-[11px] text-muted-foreground">
         {MODES.map((m) => ACTS.map((a) => <th key={`${m.key}-${a}`} className="px-0.5 py-0.5 text-center">{a}</th>))}
+      </tr>
+    </thead>
+  );
+}
+
+/** Assessment-table header: one hours column per delivery mode (no L/T/P/O). */
+function AssessmentHead() {
+  return (
+    <thead>
+      <tr className="text-xs text-muted-foreground">
+        <th className="px-2 py-1 text-left">Assessment</th>
+        <th className="px-2 py-1 text-center">Weight %</th>
+        {MODES.map((m) => (
+          <th key={m.key} className="px-2 py-1 text-center">{m.label}</th>
+        ))}
+        <th className="px-2 py-1 text-center">Total</th>
+        <th className="px-2 py-1" />
       </tr>
     </thead>
   );
@@ -172,18 +234,27 @@ export function SltSectionForm({
   const setGroup = (g: "continuous" | "final", rows: AssessmentRowForm[]) => onChange({ ...value, [g]: rows });
 
   const cellSetter =
-    <T extends { cells: CellForm }>(rows: T[], i: number, apply: (rows: T[]) => void) =>
+    (i: number) =>
     (mode: ModeKey, act: ActCode, v: string) =>
-      apply(rows.map((r, idx) => (idx === i ? { ...r, cells: { ...r.cells, [mode]: { ...r.cells[mode], [act]: v } } } : r)));
+      setContent(
+        value.content.map((r, idx) =>
+          idx === i ? { ...r, cells: { ...r.cells, [mode]: { ...r.cells[mode], [act]: v } } } : r,
+        ),
+      );
+
+  const modeSetter =
+    (g: "continuous" | "final", rows: AssessmentRowForm[], i: number) =>
+    (mode: ModeKey, v: string) =>
+      setGroup(g, rows.map((r, idx) => (idx === i ? { ...r, hours: { ...r.hours, [mode]: v } } : r)));
 
   return (
     <div className="space-y-8">
       <p className="text-sm text-muted-foreground">
-        Distribute each topic&apos;s and assessment&apos;s Student Learning Time across delivery modes
-        (Physical, Online, Independent) and activities — Lecture (L), Tutoring (T), Practice (P),
-        Other (O). Totals and the Grand Total SLT are calculated automatically. Each assessment&apos;s
-        weight is derived from its share of the total assessment SLT. Content-topic hours also drive
-        each CLO&apos;s SLT in §15.
+        Distribute each topic&apos;s Student Learning Time across delivery modes (Physical, Online,
+        Independent) and activities — Lecture (L), Tutoring (T), Practice (P), Other (O). Assessment
+        rows record hours per delivery mode only. Totals and the Grand Total SLT are calculated
+        automatically. Each assessment&apos;s weight is derived from its share of the total assessment
+        SLT, and content-topic hours drive each CLO&apos;s SLT in §15.
       </p>
 
       {/* -------- Course Content -------- */}
@@ -196,13 +267,13 @@ export function SltSectionForm({
         ) : null}
         <div className="overflow-x-auto rounded-lg border border-border">
           <table className="min-w-max border-collapse text-sm">
-            <GridHead leadCols={["Topic", "CLO"]} />
+            <ContentHead />
             <tbody>
               {value.content.map((row, i) => (
                 <tr key={row.id} className="border-t border-border">
                   <td className="px-2 py-1">
                     <input
-                      className="h-8 w-56 rounded border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      className={titleInputCls}
                       placeholder="Topic title"
                       value={row.title}
                       onChange={(e) => setContent(value.content.map((r, idx) => (idx === i ? { ...r, title: e.target.value } : r)))}
@@ -218,7 +289,7 @@ export function SltSectionForm({
                       {clos.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </select>
                   </td>
-                  <CellInputs cells={row.cells} onCell={cellSetter(value.content, i, setContent)} />
+                  <CellInputs cells={row.cells} onCell={cellSetter(i)} />
                   <td className="px-2 py-1 text-center font-medium text-foreground">{formRowTotal(row.cells)}</td>
                   <td className="whitespace-nowrap px-2 py-1 text-xs">
                     <RowControls
@@ -230,7 +301,7 @@ export function SltSectionForm({
                 </tr>
               ))}
             </tbody>
-            <GroupFoot rows={value.content} label="Total SLT for Course Content" total={totals.contentTotal} leadSpan={2} />
+            <ContentFoot rows={value.content} label="Total SLT for Course Content" total={totals.contentTotal} />
           </table>
         </div>
         <AddRowButton label="Add topic" onClick={() => setContent([...value.content, blankTopic()])} />
@@ -246,13 +317,13 @@ export function SltSectionForm({
             <h3 className="text-sm font-semibold text-foreground">{heading}</h3>
             <div className="overflow-x-auto rounded-lg border border-border">
               <table className="min-w-max border-collapse text-sm">
-                <GridHead leadCols={["Assessment", "Weight %"]} />
+                <AssessmentHead />
                 <tbody>
                   {rows.map((row, i) => (
                     <tr key={row.id} className="border-t border-border">
                       <td className="px-2 py-1">
                         <input
-                          className="h-8 w-56 rounded border border-border bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                          className={titleInputCls}
                           placeholder="Assessment title"
                           value={row.title}
                           onChange={(e) => setGroup(g, rows.map((r, idx) => (idx === i ? { ...r, title: e.target.value } : r)))}
@@ -263,13 +334,13 @@ export function SltSectionForm({
                           className="inline-flex h-8 min-w-[3rem] items-center justify-center rounded border border-border bg-muted px-2 text-sm text-muted-foreground"
                           title="Auto: this assessment's share of total assessment SLT"
                         >
-                          {assessmentWeight(row.cells, totals.assessmentTotal) == null
+                          {assessmentWeight(row.hours, totals.assessmentTotal) == null
                             ? "—"
-                            : `${assessmentWeight(row.cells, totals.assessmentTotal)}%`}
+                            : `${assessmentWeight(row.hours, totals.assessmentTotal)}%`}
                         </span>
                       </td>
-                      <CellInputs cells={row.cells} onCell={cellSetter(rows, i, (rs) => setGroup(g, rs))} />
-                      <td className="px-2 py-1 text-center font-medium text-foreground">{formRowTotal(row.cells)}</td>
+                      <ModeInputs hours={row.hours} onMode={modeSetter(g, rows, i)} />
+                      <td className="px-2 py-1 text-center font-medium text-foreground">{formModeTotal(row.hours)}</td>
                       <td className="whitespace-nowrap px-2 py-1 text-xs">
                         <RowControls
                           onUp={() => setGroup(g, reorder(rows, i, i - 1))}
@@ -280,7 +351,7 @@ export function SltSectionForm({
                     </tr>
                   ))}
                 </tbody>
-                <GroupFoot rows={rows} label={`Total SLT for ${heading}`} total={total} leadSpan={2} />
+                <AssessmentFoot rows={rows} label={`Total SLT for ${heading}`} total={total} />
               </table>
             </div>
             <AddRowButton label="Add assessment" onClick={() => setGroup(g, [...rows, blankAssessment()])} />
@@ -318,13 +389,29 @@ function AddRowButton({ label, onClick }: { label: string; onClick: () => void }
   );
 }
 
-function GroupFoot({ rows, label, total, leadSpan }: { rows: { cells: CellForm }[]; label: string; total: number; leadSpan: number }) {
+/** Content footer: per-column (mode × activity) subtotals + section total. */
+function ContentFoot({ rows, label, total }: { rows: TopicRowForm[]; label: string; total: number }) {
   const colTotal = (mode: ModeKey, act: ActCode) => rows.reduce((s, r) => s + Number(r.cells[mode][act] || 0), 0);
   return (
     <tfoot>
       <tr className="border-t border-border bg-muted/40 text-xs font-medium text-foreground">
-        <td colSpan={leadSpan} className="px-2 py-1">{label}</td>
+        <td colSpan={2} className="px-2 py-1">{label}</td>
         {MODES.map((m) => ACTS.map((a) => <td key={`${m.key}-${a}`} className="px-0.5 py-1 text-center">{colTotal(m.key, a) || ""}</td>))}
+        <td className="px-2 py-1 text-center">{total}</td>
+        <td />
+      </tr>
+    </tfoot>
+  );
+}
+
+/** Assessment footer: per-mode subtotals + section total. */
+function AssessmentFoot({ rows, label, total }: { rows: AssessmentRowForm[]; label: string; total: number }) {
+  const colTotal = (mode: ModeKey) => rows.reduce((s, r) => s + Number(r.hours[mode] || 0), 0);
+  return (
+    <tfoot>
+      <tr className="border-t border-border bg-muted/40 text-xs font-medium text-foreground">
+        <td colSpan={2} className="px-2 py-1">{label}</td>
+        {MODES.map((m) => <td key={m.key} className="px-2 py-1 text-center">{colTotal(m.key) || ""}</td>)}
         <td className="px-2 py-1 text-center">{total}</td>
         <td />
       </tr>
