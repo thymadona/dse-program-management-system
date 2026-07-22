@@ -62,7 +62,7 @@ export const coursesManifest: PluginManifest = {
   version: "0.1.0",
   description: "Courses — CRUD, list, assign lecturer.",
   routes: [{ label: "Courses", path: "/courses", icon: "book" }],
-  permissions: ["courses:read", "courses:write"],
+  permissions: ["courses:read", "courses:write", "courses:manage"],
 };
 
 export const offeringsManifest: PluginManifest = {
@@ -71,7 +71,7 @@ export const offeringsManifest: PluginManifest = {
   version: "0.1.0",
   description: "Links Students, Courses and Lecturers for a given term.",
   routes: [{ label: "Course Offerings", path: "/offerings", icon: "layers" }],
-  permissions: ["offerings:read", "offerings:write"],
+  permissions: ["offerings:read", "offerings:write", "offerings:manage"],
 };
 
 export const lecturersManifest: PluginManifest = {

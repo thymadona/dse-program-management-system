@@ -8,6 +8,7 @@ import { courseTypeLabel } from "@dse-pms/shared-types";
 import { DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { coursesApi, type CourseView } from "@/lib/courses";
 import { lecturersApi } from "@/lib/lecturers";
+import { authApi } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { CourseForm, type CourseFormValues } from "./course-form";
 
@@ -17,6 +18,7 @@ export function CoursesClient() {
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -43,6 +45,15 @@ export function CoursesClient() {
   // Lecturers for the assign dropdown (loaded once).
   useEffect(() => {
     lecturersApi.list().then(setLecturers).catch(() => setLecturers([]));
+  }, []);
+
+  // Creating/editing/deleting a course record is admin-only (courses:manage);
+  // lecturers only fill in the spec of their assigned courses via "Syllabus".
+  useEffect(() => {
+    authApi
+      .me()
+      .then((me) => setIsAdmin(me.role === "admin"))
+      .catch(() => setIsAdmin(false));
   }, []);
 
   const handleSubmit = async (values: CourseFormValues) => {
@@ -117,11 +128,15 @@ export function CoursesClient() {
         search={search}
         onSearchChange={setSearch}
         searchPlaceholder="Search courses…"
-        addLabel="Add Course"
-        onAdd={() => {
-          setEditing(null);
-          setFormOpen(true);
-        }}
+        addLabel={isAdmin ? "Add Course" : undefined}
+        onAdd={
+          isAdmin
+            ? () => {
+                setEditing(null);
+                setFormOpen(true);
+              }
+            : undefined
+        }
       />
 
       {error ? (
@@ -143,11 +158,15 @@ export function CoursesClient() {
             onClick: (c) => router.push(`/courses/${c.id}/spec`),
           },
         ]}
-        onEdit={(c) => {
-          setEditing(c);
-          setFormOpen(true);
-        }}
-        onDelete={handleDelete}
+        onEdit={
+          isAdmin
+            ? (c) => {
+                setEditing(c);
+                setFormOpen(true);
+              }
+            : undefined
+        }
+        onDelete={isAdmin ? handleDelete : undefined}
         loading={loading}
         emptyMessage="No courses yet. Add your first course."
       />

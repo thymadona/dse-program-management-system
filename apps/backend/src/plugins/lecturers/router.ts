@@ -4,7 +4,7 @@ import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { lecturerService, NotFoundError } from "./service.ts";
 
-/** Lecturers router — read for everyone, write for admins/lecturers. */
+/** Lecturers router — read for everyone, write for admins only (a lecturer cannot edit lecturer profiles, including their own, through this route). */
 export function createLecturerRouter(): Router {
   const router = Router();
   router.use(requireAuth);
