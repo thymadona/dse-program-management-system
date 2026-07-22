@@ -61,7 +61,7 @@ export const coursesManifest: PluginManifest = {
   name: "Courses",
   version: "0.1.0",
   description: "Courses — CRUD, list, assign lecturer.",
-  routes: [{ label: "Courses", path: "/courses", icon: "book" }],
+  routes: [{ label: "Course Management", path: "/courses", icon: "book" }],
   permissions: ["courses:read", "courses:write"],
 };
 
