@@ -35,6 +35,19 @@ Match the title style already in use (`docs: README is missing a Testing section
 `Add Total SLT when create a new course`) — imperative or `type:` prefix, not a
 restatement of the user's chat message.
 
+Every new issue also goes on the **DSE PMS Roadmap** project board (project #4,
+owner `thymadona`) — `gh issue create` doesn't do this itself, so add it as a
+separate step right after creating (or reusing) the issue:
+
+```bash
+gh project item-add 4 --owner thymadona --url <issue-url>
+```
+
+`gh issue create` prints the issue URL on success — pass that straight through.
+If you're attaching to an issue found in step 1 rather than a newly created one,
+check first whether it's already on the board (`gh project item-list 4 --owner
+thymadona`) before adding it again.
+
 ## 2. Branch
 
 Name it `<type>/<slug>`, matching existing branches — `feat/`, `fix/`, `docs/`,
