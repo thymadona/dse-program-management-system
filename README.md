@@ -51,6 +51,16 @@ Open http://localhost:3000 → redirects to `/students`.
 
 `bun run gen-token --role student` mints a read-only token — writes return 403.
 
+## Testing
+
+Only `packages/shared-types` currently has tests (`bun:test`). Run them all from
+the repo root, or scope to one file from inside that package:
+
+```bash
+bun test                              # all tests
+bun test src/course-spec.test.ts      # single file (from packages/shared-types)
+```
+
 ## Adding a plugin later
 
 1. Add its manifest to `pluginManifests` in `packages/shared-types/src/plugins.ts`.
