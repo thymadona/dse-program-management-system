@@ -32,7 +32,9 @@ export function createCourseRouter(): Router {
     res.json(course);
   });
 
-  router.post("/", requirePermission("courses:write"), async (req, res) => {
+  // Creating/deleting/directly-editing a course record (code, credits, lecturer
+  // assignment, ...) is curriculum-admin work, not something a lecturer does.
+  router.post("/", requirePermission("courses:manage"), async (req, res) => {
     const parsed = CreateCourseInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -45,7 +47,7 @@ export function createCourseRouter(): Router {
     }
   });
 
-  router.patch("/:id", requirePermission("courses:write"), async (req, res) => {
+  router.patch("/:id", requirePermission("courses:manage"), async (req, res) => {
     const parsed = UpdateCourseInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -58,7 +60,7 @@ export function createCourseRouter(): Router {
     }
   });
 
-  router.delete("/:id", requirePermission("courses:write"), async (req, res) => {
+  router.delete("/:id", requirePermission("courses:manage"), async (req, res) => {
     try {
       await courseService.remove(req.params.id!);
       res.status(204).end();
@@ -79,6 +81,16 @@ export function createCourseRouter(): Router {
   });
 
   router.put("/:id/spec/:sectionId", requirePermission("courses:write"), async (req, res) => {
+    // A lecturer may only fill in the spec for a course they're assigned to;
+    // admins can edit any course's spec.
+    if (req.user!.role !== "admin") {
+      const course = await courseService.getById(req.params.id!);
+      if (!course || course.lecturerId !== req.user!.id) {
+        res.status(403).json({ error: "You can only edit the specification for your own courses" });
+        return;
+      }
+    }
+
     const sectionId = req.params.sectionId as SpecSectionId;
     const schema = SPEC_SECTION_SCHEMAS[sectionId];
     if (!schema) {

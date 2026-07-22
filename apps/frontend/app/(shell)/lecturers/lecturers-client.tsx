@@ -132,11 +132,15 @@ export function LecturersClient() {
             search={search}
             onSearchChange={setSearch}
             searchPlaceholder="Search lecturers…"
-            addLabel="Add Lecturer"
-            onAdd={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
+            addLabel={isAdmin ? "Add Lecturer" : undefined}
+            onAdd={
+              isAdmin
+                ? () => {
+                    setEditing(null);
+                    setFormOpen(true);
+                  }
+                : undefined
+            }
           />
         </div>
         {isAdmin ? (
@@ -162,11 +166,15 @@ export function LecturersClient() {
         columns={columns}
         rows={rows}
         getRowId={(l) => l.id}
-        onEdit={(l) => {
-          setEditing(l);
-          setFormOpen(true);
-        }}
-        onDelete={handleDelete}
+        onEdit={
+          isAdmin
+            ? (l) => {
+                setEditing(l);
+                setFormOpen(true);
+              }
+            : undefined
+        }
+        onDelete={isAdmin ? handleDelete : undefined}
         loading={loading}
         emptyMessage="No lecturers yet. Add your first lecturer."
       />

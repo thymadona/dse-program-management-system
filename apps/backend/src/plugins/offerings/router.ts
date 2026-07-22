@@ -31,7 +31,9 @@ export function createOfferingRouter(): Router {
     res.json(offering);
   });
 
-  router.post("/", requirePermission("offerings:write"), async (req, res) => {
+  // Scheduling an offering (term, capacity, status, lecturer assignment) is
+  // curriculum-admin work, not something a lecturer does for their own class.
+  router.post("/", requirePermission("offerings:manage"), async (req, res) => {
     const parsed = CreateOfferingInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -44,7 +46,7 @@ export function createOfferingRouter(): Router {
     }
   });
 
-  router.patch("/:id", requirePermission("offerings:write"), async (req, res) => {
+  router.patch("/:id", requirePermission("offerings:manage"), async (req, res) => {
     const parsed = UpdateOfferingInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -57,7 +59,7 @@ export function createOfferingRouter(): Router {
     }
   });
 
-  router.delete("/:id", requirePermission("offerings:write"), async (req, res) => {
+  router.delete("/:id", requirePermission("offerings:manage"), async (req, res) => {
     try {
       await offeringService.remove(req.params.id!);
       res.status(204).end();
@@ -66,8 +68,10 @@ export function createOfferingRouter(): Router {
     }
   });
 
-  // Enrollment management (links Students <-> this offering).
+  // Enrollment management (links Students <-> this offering). A lecturer may only
+  // manage the roster of an offering they're assigned to; admins can manage any.
   router.post("/:id/enrollments", requirePermission("offerings:write"), async (req, res) => {
+    if (!(await assertOwnOfferingOrAdmin(req, res))) return;
     const parsed = EnrollInput.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid body", details: parsed.error.flatten() });
@@ -84,6 +88,7 @@ export function createOfferingRouter(): Router {
     "/:id/enrollments/:studentId",
     requirePermission("offerings:write"),
     async (req, res) => {
+      if (!(await assertOwnOfferingOrAdmin(req, res))) return;
       try {
         res.json(await offeringService.unenroll(req.params.id!, req.params.studentId!));
       } catch (err) {
@@ -93,6 +98,20 @@ export function createOfferingRouter(): Router {
   );
 
   return router;
+}
+
+/** True (and untouched response) if the caller may manage this offering's roster. */
+async function assertOwnOfferingOrAdmin(
+  req: import("express").Request,
+  res: import("express").Response,
+): Promise<boolean> {
+  if (req.user!.role === "admin") return true;
+  const offering = await offeringService.getById(req.params.id!);
+  if (!offering || offering.lecturer?.id !== req.user!.id) {
+    res.status(403).json({ error: "You can only manage enrollment for your own offerings" });
+    return false;
+  }
+  return true;
 }
 
 function handleError(err: unknown, res: import("express").Response, fallback: string): void {
