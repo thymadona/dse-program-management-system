@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  perCloSlt,
   SPEC_SECTIONS,
   type Method,
   type SpecSectionId,
@@ -96,8 +95,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const next = SPEC_SECTIONS[activeIndex + 1];
   const canSave = activeMeta?.state === "ready" && activeId !== "programme";
 
-  const sltByClo = useMemo(() => perCloSlt(toSltPayload(slt).content), [slt]);
-
   const handleSave = async () => {
     if (!canSave) return;
     setSaving(true);
@@ -113,7 +110,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         await courseSpecApi.saveSection(
           courseId,
           "cloMapping",
-          toCloMappingPayload(reconciled, sltByClo, courseTotalSlt),
+          toCloMappingPayload(reconciled, courseTotalSlt),
         );
       } else if (activeId === "slt") {
         await courseSpecApi.saveSection(courseId, "slt", toSltPayload(slt));
@@ -213,7 +210,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
               onChange={setCloMapping}
               teachingMethods={teachingMethods}
               assessmentMethods={assessmentMethods}
-              sltByClo={sltByClo}
               courseTotalSlt={courseTotalSlt}
             />
           ) : activeId === "slt" ? (

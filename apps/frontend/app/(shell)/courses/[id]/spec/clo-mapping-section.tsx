@@ -70,21 +70,13 @@ export function focusCodeOf(percent: number | null): string {
 
 /**
  * Convert the reconciled rows into the CloMappingSection payload the API validates.
- * Focus % and its F/M/P category are derived from each CLO's share of the course's
- * admin-entered total SLT.
+ * SLT hours are entered by the lecturer per CLO; focus % and its F/M/P category are
+ * derived from each CLO's share of the course's total SLT.
  */
-export function toCloMappingPayload(
-  rows: CloMappingForm[],
-  sltByClo: Record<string, number> | undefined,
-  courseTotalSlt: number | null,
-) {
-  const effective = rows.map((r) => {
-    const derived = sltByClo?.[r.cloCode];
-    return derived != null ? { ...r, sltHours: String(derived) } : r;
-  });
+export function toCloMappingPayload(rows: CloMappingForm[], courseTotalSlt: number | null) {
   const total = courseTotalSlt;
   return {
-    items: effective.map((f) => {
+    items: rows.map((f) => {
       const percent = focusPercentOf(f.sltHours, total);
       return {
         cloCode: f.cloCode,
@@ -104,7 +96,6 @@ export function CloMappingSection({
   onChange,
   teachingMethods,
   assessmentMethods,
-  sltByClo,
   courseTotalSlt,
 }: {
   clos: CloForm[];
@@ -112,13 +103,12 @@ export function CloMappingSection({
   onChange: (rows: CloMappingForm[]) => void;
   teachingMethods: Method[];
   assessmentMethods: Method[];
-  sltByClo?: Record<string, number>;
   courseTotalSlt: number | null;
 }) {
   const rows = reconcileMapping(clos, value);
-  const effectiveHours = (row: CloMappingForm) =>
-    sltByClo?.[row.cloCode] != null ? String(sltByClo[row.cloCode]) : row.sltHours;
   const total = courseTotalSlt;
+  const assignedTotal = rows.reduce((s, r) => s + (Number(r.sltHours) || 0), 0);
+  const sltMismatch = total != null && assignedTotal !== total;
 
   const update = (index: number, patch: Partial<CloMappingForm>) => {
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -138,21 +128,34 @@ export function CloMappingSection({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        For each CLO, record the Student Learning Time spent on its PLO, plus the teaching and
-        assessment methods used. Focus % and its F/M/P category are calculated automatically from
-        each CLO&apos;s share of the course&apos;s total SLT. The PLO and C/A/P level are carried
-        over from §14.
+        For each CLO, enter the Student Learning Time spent on its PLO, plus the teaching and
+        assessment methods used. The SLT hours you assign across CLOs must add up to the course&apos;s
+        total SLT. Focus % and its F/M/P category are calculated automatically from each CLO&apos;s
+        share of that total. The PLO and C/A/P level are carried over from §14.
       </p>
 
       <ReferenceGuide title="Focus on PLO (F / M / P)" rows={[...FOCUS_LEVELS]} />
 
-      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
-        <span className="text-muted-foreground">Total SLT (course)</span>
-        {total != null ? (
-          <span className="font-semibold text-foreground">{total} h</span>
-        ) : (
-          <span className="text-muted-foreground">— set it on the course</span>
-        )}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
+          <span className="text-muted-foreground">Total SLT (course)</span>
+          {total != null ? (
+            <span className="font-semibold text-foreground">{total} h</span>
+          ) : (
+            <span className="text-muted-foreground">— set it on the course</span>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-3 text-sm">
+          <span className="text-muted-foreground">Assigned across CLOs</span>
+          <span className={sltMismatch ? "font-semibold text-amber-600" : "font-medium text-foreground"}>
+            {assignedTotal} h
+          </span>
+        </div>
+        {sltMismatch ? (
+          <p className="px-3 text-xs text-amber-600">
+            ⚠ CLO SLT hours add up to {assignedTotal} h but the course total SLT is {total} h — they must match.
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-4">
@@ -160,11 +163,9 @@ export function CloMappingSection({
           const clo = cloFor(row.cloCode);
           const ploId = clo?.ploId || "";
           const level = clo?.level || "";
-          const hours = effectiveHours(row);
-          const percent = focusPercentOf(hours, total);
+          const percent = focusPercentOf(row.sltHours, total);
           const focusCode = focusCodeOf(percent);
           const focusName = FOCUS_LEVELS.find((f) => f.code === focusCode)?.name;
-          const derivedHours = sltByClo?.[row.cloCode];
           return (
             <fieldset key={row.cloCode} className="space-y-3 rounded-lg border border-border p-4">
               <legend className="flex flex-wrap items-center gap-2 px-1">
@@ -184,23 +185,14 @@ export function CloMappingSection({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="block space-y-1.5">
                   <span className="text-sm font-medium text-foreground">SLT hours on PLO</span>
-                  {derivedHours != null ? (
-                    <div
-                      className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
-                      title="Summed from §16 topic hours for this CLO"
-                    >
-                      {derivedHours} h · from §16
-                    </div>
-                  ) : (
-                    <input
-                      type="number"
-                      min={0}
-                      placeholder="e.g. 42"
-                      className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                      value={row.sltHours}
-                      onChange={(e) => update(i, { sltHours: e.target.value })}
-                    />
-                  )}
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="e.g. 42"
+                    className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    value={row.sltHours}
+                    onChange={(e) => update(i, { sltHours: e.target.value })}
+                  />
                 </label>
                 <div className="block space-y-1.5">
                   <span className="text-sm font-medium text-foreground">Focus (auto)</span>
