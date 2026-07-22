@@ -1,21 +1,85 @@
 // Utilities
 export { cn } from "./lib/cn.ts";
 
-// Primitives
-export { Button, type ButtonProps } from "./primitives/button.tsx";
-export { Input } from "./primitives/input.tsx";
-export { Switch } from "./primitives/switch.tsx";
-export { Checkbox } from "./primitives/checkbox.tsx";
+// Primitives (@base-ui/react — see components.json "style": "base-luma")
+export { Button, buttonVariants } from "./components/ui/button.tsx";
+export { Input } from "./components/ui/input.tsx";
+export { Switch } from "./components/ui/switch.tsx";
+export { Checkbox } from "./components/ui/checkbox.tsx";
 export {
   Dialog,
   DialogTrigger,
   DialogClose,
+  DialogPortal,
+  DialogOverlay,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "./primitives/dialog.tsx";
+} from "./components/ui/dialog.tsx";
+export { Label } from "./components/ui/label.tsx";
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+} from "./components/ui/select.tsx";
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+} from "./components/ui/dropdown-menu.tsx";
+export { Separator } from "./components/ui/separator.tsx";
+export { Skeleton } from "./components/ui/skeleton.tsx";
+export {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "./components/ui/tooltip.tsx";
+export {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupAction,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInput,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSkeleton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
+  useSidebar,
+} from "./components/ui/sidebar.tsx";
 
 // Composed components
 export { StatusBadge, type StatusTone, type StatusBadgeProps } from "./components/status-badge.tsx";

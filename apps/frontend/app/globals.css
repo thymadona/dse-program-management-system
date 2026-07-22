@@ -1,20 +1,33 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@dse-pms/config/theme.css";
+
+/* The shared @dse-pms/ui package lives outside this app's default content
+   scan root, so its class names need an explicit source. */
+@source "../../../packages/ui/src";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 /**
- * Noviq design-system tokens as CSS variables, consumed by the shared Tailwind
- * preset (packages/config/tailwind-preset.ts).
+ * Noviq design-system tokens as CSS variables. Values here (and in .dark
+ * below) are what packages/config/theme.css maps onto Tailwind utilities
+ * (bg-primary, text-foreground, …).
  */
 :root {
   --canvas: #f0f4f8;
+  --background: var(--canvas);
   --card: #ffffff;
   --foreground: #102a30;
 
+  /* Sidebar stays a fixed brand navy in both themes — it does not flip with
+     light/dark mode, so these have no .dark override below. */
   --sidebar: #102a30;
   --sidebar-foreground: #e7edf0;
   --sidebar-muted: #7c8f95;
   --sidebar-active: #1c3d45;
+  --sidebar-border: #1c3d45;
+  --sidebar-ring: #4f95d1;
 
   --primary: #102a30;
   --primary-foreground: #ffffff;
@@ -37,11 +50,11 @@
   --status-neutral-bg: #f1f5f9;
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-heading: var(--font-sans);
 
   /* shadcn/ui CLI tokens — aliased onto the Noviq tokens above where an
      equivalent exists; `destructive` has no Noviq equivalent so is a plain
      placeholder red, retint if the brand wants a different error colour. */
-  --background: var(--canvas);
   --popover: var(--card);
   --popover-foreground: var(--foreground);
   --secondary: var(--muted);
@@ -53,9 +66,48 @@
   --radius: 0.75rem;
 }
 
-html,
+/**
+ * Dark theme — same token names, re-tinted for a dark canvas. Sidebar tokens
+ * are intentionally absent here; the sidebar keeps its fixed brand navy.
+ */
+.dark {
+  --canvas: #0b171c;
+  --card: #12242b;
+  --foreground: #e7edf0;
+
+  --primary: #21424a;
+  --primary-foreground: #ffffff;
+
+  --accent: #2f5773;
+  --accent-foreground: #eaf2fa;
+
+  --border: #24393f;
+  --muted: #17282e;
+  --muted-foreground: #8a9aa1;
+
+  --status-live: #34d399;
+  --status-live-bg: rgba(21, 160, 106, 0.16);
+  --status-upcoming: #f5a24d;
+  --status-upcoming-bg: rgba(224, 123, 26, 0.18);
+  --status-tournament: #a78bfa;
+  --status-tournament-bg: rgba(139, 92, 246, 0.18);
+  --status-neutral: #94a3b8;
+  --status-neutral-bg: rgba(100, 116, 139, 0.2);
+
+  --destructive: #f87171;
+  --destructive-foreground: #2a0a0a;
+}
+
 body {
   background-color: var(--canvas);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }

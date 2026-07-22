@@ -6,9 +6,6 @@
   "main": "index.ts",
   "exports": {
     "./tsconfig.base.json": "./tsconfig.base.json",
-    "./tailwind-preset": "./tailwind-preset.ts"
-  },
-  "devDependencies": {
-    "tailwindcss": "^3.4.14"
+    "./theme.css": "./theme.css"
   }
 }

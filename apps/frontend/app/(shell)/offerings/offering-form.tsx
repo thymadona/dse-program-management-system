@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CreateOfferingInput,
@@ -20,6 +20,11 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@dse-pms/ui";
 
 export type OfferingFormValues = {
@@ -48,6 +53,10 @@ interface OfferingFormProps {
 }
 
 const UNASSIGNED = "";
+// The Select item value can't be "" (that's reserved for "nothing selected"),
+// so optional/clearable fields use these sentinels and map back to "" at the edges.
+const NOT_SET = "__not_set__";
+const UNASSIGNED_SENTINEL = "__unassigned__";
 
 export function OfferingForm({
   open,
@@ -60,6 +69,7 @@ export function OfferingForm({
 }: OfferingFormProps) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -129,47 +139,65 @@ export function OfferingForm({
           className="space-y-4"
         >
           <Field label="Course" error={errors.courseId?.message}>
-            <select
-              className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              disabled={Boolean(editing)}
-              {...register("courseId")}
-            >
-              <option value="">— Select course —</option>
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.code} — {c.title}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="courseId"
+              render={({ field }) => (
+                <Select
+                  value={field.value || null}
+                  onValueChange={(v) => field.onChange(v ?? "")}
+                  disabled={Boolean(editing)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="— Select course —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {courses.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.code} — {c.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
           <Field label="Term" error={errors.term?.message}>
             <Input placeholder="2025-Fall" {...register("term")} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Semester (§12)">
-              <select
-                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                value={semester}
-                onChange={(e) => setSemester(e.target.value)}
+              <Select
+                value={semester === "" ? NOT_SET : semester}
+                onValueChange={(v) => setSemester(v && v !== NOT_SET ? v : "")}
               >
-                <option value="">— Not set —</option>
-                <option value="First">1st Semester</option>
-                <option value="Second">2nd Semester</option>
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NOT_SET}>— Not set —</SelectItem>
+                  <SelectItem value="First">1st Semester</SelectItem>
+                  <SelectItem value="Second">2nd Semester</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="Year (§12)">
-              <select
-                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                value={programmeYear}
-                onChange={(e) => setProgrammeYear(e.target.value)}
+              <Select
+                value={programmeYear === "" ? NOT_SET : programmeYear}
+                onValueChange={(v) => setProgrammeYear(v && v !== NOT_SET ? v : "")}
               >
-                <option value="">— Not set —</option>
-                {YEAR_OPTIONS.map((y) => (
-                  <option key={y} value={y}>
-                    Year {y}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NOT_SET}>— Not set —</SelectItem>
+                  {YEAR_OPTIONS.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      Year {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -177,30 +205,49 @@ export function OfferingForm({
               <Input type="number" min={1} {...register("capacity", { valueAsNumber: true })} />
             </Field>
             <Field label="Status" error={errors.status?.message}>
-              <select
-                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                {...register("status")}
-              >
-                {OFFERING_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={control}
+                name="status"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OFFERING_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </Field>
           </div>
           <Field label="Lecturer" error={errors.lecturerId?.message}>
-            <select
-              className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              {...register("lecturerId")}
-            >
-              <option value={UNASSIGNED}>— Unassigned —</option>
-              {lecturers.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="lecturerId"
+              render={({ field }) => (
+                <Select
+                  value={field.value || UNASSIGNED_SENTINEL}
+                  onValueChange={(v) => field.onChange(v === UNASSIGNED_SENTINEL ? UNASSIGNED : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED_SENTINEL}>— Unassigned —</SelectItem>
+                    {lecturers.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
           <Field label="Other lecturer(s) (§10)" error={errors.otherLecturers?.message}>
             <Input placeholder="Co-teachers this term (optional)" {...register("otherLecturers")} />

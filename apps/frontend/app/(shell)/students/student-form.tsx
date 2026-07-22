@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CreateStudentInput,
@@ -17,6 +17,11 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@dse-pms/ui";
 
 export interface StudentFormValues extends CreateStudentInput {}
@@ -40,6 +45,7 @@ export function StudentForm({
 }: StudentFormProps) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -90,16 +96,24 @@ export function StudentForm({
             <Input placeholder="DSE-0006" {...register("studentId")} />
           </Field>
           <Field label="Status" error={errors.status?.message}>
-            <select
-              className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              {...register("status")}
-            >
-              {STUDENT_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="status"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STUDENT_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
 
           <DialogFooter>
