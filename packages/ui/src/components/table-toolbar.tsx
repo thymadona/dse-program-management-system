@@ -1,9 +1,9 @@
 import * as React from "react";
 import { Plus, Search } from "lucide-react";
 import { cn } from "../lib/cn.ts";
-import { Button } from "../primitives/button.tsx";
-import { Input } from "../primitives/input.tsx";
-import { Switch } from "../primitives/switch.tsx";
+import { Button } from "./ui/button.tsx";
+import { Input } from "./ui/input.tsx";
+import { Switch } from "./ui/switch.tsx";
 
 export interface TableToolbarProps {
   search: string;
@@ -50,7 +50,7 @@ export function TableToolbar({
           </label>
         ) : null}
         {addLabel && onAdd ? (
-          <Button onClick={onAdd} variant="accent">
+          <Button onClick={onAdd}>
             <Plus className="h-4 w-4" />
             {addLabel}
           </Button>

@@ -118,14 +118,16 @@ export function EnrollmentDialog({
                     <span>
                       {s.name} <span className="text-muted-foreground">· {s.studentId}</span>
                     </span>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
                       onClick={() => unenroll(s.id)}
                       disabled={busy}
                       aria-label={`Remove ${s.name}`}
-                      className="rounded p-1 text-muted-foreground hover:bg-status-live-bg hover:text-status-live disabled:opacity-50"
+                      className="text-muted-foreground hover:bg-status-live-bg hover:text-status-live"
                     >
                       <X className="h-4 w-4" />
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>

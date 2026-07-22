@@ -1,7 +1,7 @@
 import * as React from "react";
 import { GripVertical, Pencil, Trash2 } from "lucide-react";
 import { cn } from "../lib/cn.ts";
-import { Checkbox } from "../primitives/checkbox.tsx";
+import { Checkbox } from "./ui/checkbox.tsx";
 
 export interface DataTableColumn<T> {
   key: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   COURSE_TYPES,
@@ -19,6 +19,11 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@dse-pms/ui";
 import type { CourseView } from "@/lib/courses";
 
@@ -44,6 +49,10 @@ interface CourseFormProps {
 }
 
 const UNASSIGNED = "";
+// The Select item value can't be "" (that's reserved for "nothing selected"),
+// so optional/clearable fields use these sentinels and map back to "" at the edges.
+const NOT_SET = "__not_set__";
+const UNASSIGNED_SENTINEL = "__unassigned__";
 
 export function CourseForm({
   open,
@@ -55,6 +64,7 @@ export function CourseForm({
 }: CourseFormProps) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors },
@@ -142,18 +152,22 @@ export function CourseForm({
               />
             </Field>
             <Field label="Course type (§11)">
-              <select
-                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                value={courseType}
-                onChange={(e) => setCourseType(e.target.value)}
+              <Select
+                value={courseType === "" ? NOT_SET : courseType}
+                onValueChange={(v) => setCourseType(v && v !== NOT_SET ? v : "")}
               >
-                <option value="">— Not set —</option>
-                {COURSE_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {courseTypeLabel(t)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NOT_SET}>— Not set —</SelectItem>
+                  {COURSE_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {courseTypeLabel(t)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           <Field label="Pre-requisites (§5)" error={errors.prerequisites?.message}>
@@ -163,17 +177,28 @@ export function CourseForm({
             />
           </Field>
           <Field label="Lecturer" error={errors.lecturerId?.message}>
-            <select
-              className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              {...register("lecturerId")}
-            >
-              <option value={UNASSIGNED}>— Unassigned —</option>
-              {lecturers.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="lecturerId"
+              render={({ field }) => (
+                <Select
+                  value={field.value || UNASSIGNED_SENTINEL}
+                  onValueChange={(v) => field.onChange(v === UNASSIGNED_SENTINEL ? UNASSIGNED : v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED_SENTINEL}>— Unassigned —</SelectItem>
+                    {lecturers.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
           </Field>
 
           <DialogFooter>
