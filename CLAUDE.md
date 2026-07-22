@@ -43,8 +43,14 @@ Bun workspaces (`apps/*`, `packages/*`) + Turborepo. `packages/shared-types` is 
 single source of truth for the plugin contract, permission strings, and every Zod
 schema — both `apps/backend` and `apps/frontend` import it, so frontend/backend
 payloads cannot drift. `packages/config` holds the shared `tsconfig.base.json` and
-Tailwind preset (design tokens); `packages/ui` holds shared React primitives
-(DataTable, StatusBadge, TableToolbar, Radix-based inputs).
+`theme.css` (the Tailwind v4 `@theme inline` mapping shared design tokens like
+`--color-primary` onto utility classes); `packages/ui` holds shared React
+primitives (DataTable, StatusBadge, TableToolbar, `@base-ui/react`-based inputs)
+generated via the shadcn CLI (`bun run --cwd packages/ui ui:add <component>`,
+style `base-luma` — see `packages/ui/components.json`). Actual brand colour
+*values* (Noviq navy) live as CSS variables in `apps/frontend/app/globals.css`
+(`:root` for light, `.dark` for dark — toggled by `next-themes`), not in
+`packages/config`, so theming doesn't require touching the shared package.
 
 ### Plugin registry (backend)
 
@@ -152,12 +158,3 @@ monorepo `root` so an unrelated parent-dir lockfile can't confuse it). Consequen
 route `params`/`searchParams` are **async** — a page/layout must be `async` and
 `await params` before reading it (see `courses/[id]/spec/page.tsx`); the old
 synchronous `{ params }: { params: { id } }` shape no longer works.
-
-### Spec-driven development workflow
-
-Feature work in this repo follows the `superpowers` skill's spec → plan → tasks
-workflow: `docs/superpowers/specs/<date>-<feature>-design.md` and
-`docs/superpowers/plans/<date>-<feature>.md` hold the design/plan for a feature
-branch, and `.superpowers/sdd/` holds per-task briefs, subagent reports, and
-review diffs plus a running `progress.md` for the branch. Check these before
-assuming a branch's intent needs to be re-derived from the diff alone.
