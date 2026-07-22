@@ -1,6 +1,6 @@
 "use client";
 
-import { FOCUS_LEVELS, type Method, type MethodKind } from "@dse-pms/shared-types";
+import { FOCUS_LEVELS, type Method } from "@dse-pms/shared-types";
 import { ReferenceGuide } from "./reference-guide";
 import { MethodChecklist } from "./method-checklist";
 import type { CloForm } from "./clos-section";
@@ -77,10 +77,14 @@ export function focusCodeOf(percent: number | null): string {
  * Convert the reconciled rows into the CloMappingSection payload the API validates.
  * Focus % and its F/M/P category are derived from each CLO's share of the total SLT.
  */
-export function toCloMappingPayload(rows: CloMappingForm[]) {
-  const total = totalSlt(rows);
+export function toCloMappingPayload(rows: CloMappingForm[], sltByClo?: Record<string, number>) {
+  const effective = rows.map((r) => {
+    const derived = sltByClo?.[r.cloCode];
+    return derived != null ? { ...r, sltHours: String(derived) } : r;
+  });
+  const total = totalSlt(effective);
   return {
-    items: rows.map((f) => {
+    items: effective.map((f) => {
       const percent = focusPercentOf(f.sltHours, total);
       return {
         cloCode: f.cloCode,
@@ -100,17 +104,19 @@ export function CloMappingSection({
   onChange,
   teachingMethods,
   assessmentMethods,
-  onAddMethod,
+  sltByClo,
 }: {
   clos: CloForm[];
   value: CloMappingForm[];
   onChange: (rows: CloMappingForm[]) => void;
   teachingMethods: Method[];
   assessmentMethods: Method[];
-  onAddMethod: (kind: MethodKind, name: string) => Promise<Method>;
+  sltByClo?: Record<string, number>;
 }) {
   const rows = reconcileMapping(clos, value);
-  const total = totalSlt(rows);
+  const effectiveHours = (row: CloMappingForm) =>
+    sltByClo?.[row.cloCode] != null ? String(sltByClo[row.cloCode]) : row.sltHours;
+  const total = rows.reduce((sum, r) => sum + (Number(effectiveHours(r)) || 0), 0);
 
   const update = (index: number, patch: Partial<CloMappingForm>) => {
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -147,9 +153,11 @@ export function CloMappingSection({
           const clo = cloFor(row.cloCode);
           const ploId = clo?.ploId || "";
           const level = clo?.level || "";
-          const percent = focusPercentOf(row.sltHours, total);
+          const hours = effectiveHours(row);
+          const percent = focusPercentOf(hours, total);
           const focusCode = focusCodeOf(percent);
           const focusName = FOCUS_LEVELS.find((f) => f.code === focusCode)?.name;
+          const derivedHours = sltByClo?.[row.cloCode];
           return (
             <fieldset key={row.cloCode} className="space-y-3 rounded-lg border border-border p-4">
               <legend className="flex flex-wrap items-center gap-2 px-1">
@@ -169,14 +177,23 @@ export function CloMappingSection({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="block space-y-1.5">
                   <span className="text-sm font-medium text-foreground">SLT hours on PLO</span>
-                  <input
-                    type="number"
-                    min={0}
-                    placeholder="e.g. 42"
-                    className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                    value={row.sltHours}
-                    onChange={(e) => update(i, { sltHours: e.target.value })}
-                  />
+                  {derivedHours != null ? (
+                    <div
+                      className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
+                      title="Summed from §16 topic hours for this CLO"
+                    >
+                      {derivedHours} h · from §16
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder="e.g. 42"
+                      className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      value={row.sltHours}
+                      onChange={(e) => update(i, { sltHours: e.target.value })}
+                    />
+                  )}
                 </label>
                 <div className="block space-y-1.5">
                   <span className="text-sm font-medium text-foreground">Focus (auto)</span>
@@ -203,7 +220,6 @@ export function CloMappingSection({
                 options={teachingMethods}
                 selectedIds={row.teachingMethodIds}
                 onChange={(ids) => update(i, { teachingMethodIds: ids })}
-                onAdd={(name) => onAddMethod("teaching", name)}
               />
 
               <MethodChecklist
@@ -211,7 +227,6 @@ export function CloMappingSection({
                 options={assessmentMethods}
                 selectedIds={row.assessmentMethodIds}
                 onChange={(ids) => update(i, { assessmentMethodIds: ids })}
-                onAdd={(name) => onAddMethod("assessment", name)}
               />
             </fieldset>
           );
