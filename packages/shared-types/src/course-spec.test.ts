@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CloMappingItem, SltSection, SPEC_SECTION_SCHEMAS } from "./course-spec.ts";
+import { CloMappingItem, SltSection, SPEC_SECTION_SCHEMAS, rowTotal, perCloSlt, sltSectionTotals } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
 test("CloMappingItem defaults method id arrays to []", () => {
@@ -57,4 +57,34 @@ test("SltAssessmentRow weight is optional and bounded 0-100", () => {
 
 test("slt is registered in SPEC_SECTION_SCHEMAS", () => {
   expect(SPEC_SECTION_SCHEMAS.slt).toBe(SltSection);
+});
+
+const cells = (o: Record<string, Record<string, number>>) =>
+  SltSection.parse({ content: [{ id: "x", title: "x", cloCode: null, cells: o }] }).content[0]!.cells;
+
+test("rowTotal sums every cell across modes and activities", () => {
+  expect(rowTotal(cells({ physical: { L: 2, P: 2 }, online: { L: 1 }, independent: { O: 3 } }))).toBe(8);
+});
+
+test("perCloSlt groups content hours by cloCode and ignores rows without a CLO", () => {
+  const section = SltSection.parse({
+    content: [
+      { id: "1", title: "A", cloCode: "CLO1", cells: { physical: { L: 4 } } },
+      { id: "2", title: "B", cloCode: "CLO1", cells: { physical: { L: 2 } } },
+      { id: "3", title: "C", cloCode: "CLO2", cells: { physical: { L: 6 } } },
+      { id: "4", title: "D", cloCode: null, cells: { physical: { L: 9 } } },
+    ],
+  });
+  expect(perCloSlt(section.content)).toEqual({ CLO1: 6, CLO2: 6 });
+});
+
+test("sltSectionTotals cascades content, continuous, final into grand total", () => {
+  const section = SltSection.parse({
+    content: [{ id: "1", title: "A", cloCode: "CLO1", cells: { physical: { L: 10 } } }],
+    continuous: [{ id: "c1", title: "Quiz", weight: 20, cells: { independent: { O: 4 } } }],
+    final: [{ id: "f1", title: "Report", weight: 40, cells: { independent: { O: 6 } } }],
+  });
+  expect(sltSectionTotals(section)).toEqual({
+    contentTotal: 10, continuousTotal: 4, finalTotal: 6, assessmentTotal: 10, grandTotal: 20,
+  });
 });

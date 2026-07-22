@@ -275,6 +275,42 @@ export const SltSection = z.object({
 });
 export type SltSection = z.infer<typeof SltSection>;
 
+/** Sum every hour cell in a row (all modes × L/T/P/O). */
+export function rowTotal(cells: SltCells): number {
+  const modes = [cells.physical, cells.online, cells.independent];
+  return modes.reduce(
+    (sum, m) => sum + (m.L ?? 0) + (m.T ?? 0) + (m.P ?? 0) + (m.O ?? 0),
+    0,
+  );
+}
+
+/** Content-topic hours summed per CLO. Rows without a cloCode are ignored. */
+export function perCloSlt(content: SltTopicRow[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const row of content) {
+    if (!row.cloCode) continue;
+    out[row.cloCode] = (out[row.cloCode] ?? 0) + rowTotal(row.cells);
+  }
+  return out;
+}
+
+/** The §16 footer cascade: content + assessment totals → grand total. */
+export function sltSectionTotals(section: SltSection) {
+  const sum = (rows: { cells: SltCells }[]) =>
+    rows.reduce((s, r) => s + rowTotal(r.cells), 0);
+  const contentTotal = sum(section.content);
+  const continuousTotal = sum(section.continuous);
+  const finalTotal = sum(section.final);
+  const assessmentTotal = continuousTotal + finalTotal;
+  return {
+    contentTotal,
+    continuousTotal,
+    finalTotal,
+    assessmentTotal,
+    grandTotal: contentTotal + assessmentTotal,
+  };
+}
+
 /** Zod schema for a given section id. Extend as later phases add sections. */
 export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
   courseInfo: CourseInfoSection,
