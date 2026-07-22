@@ -37,7 +37,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
   { id: "courseInfo", title: "Course Information", ref: "§1–13", part: "Part 2", state: "ready" },
   { id: "clos", title: "Course Learning Outcomes", ref: "§14", part: "Part 2", state: "ready" },
   { id: "cloMapping", title: "CLO → PLO Mapping & Methods", ref: "§15", part: "Part 2", state: "ready" },
-  { id: "slt", title: "Student Learning Time", ref: "§16", part: "Part 2", state: "soon" },
+  { id: "slt", title: "Student Learning Time", ref: "§16", part: "Part 2", state: "ready" },
   { id: "assessmentPlan", title: "Course Assessment Plan", ref: "§17", part: "Part 2", state: "soon" },
   { id: "lessonPlan", title: "Course Outline & Lesson Plan", ref: "§18", part: "Part 2", state: "soon" },
   { id: "resources", title: "Required Resources", ref: "§19", part: "Part 2", state: "soon" },
@@ -231,11 +231,107 @@ export const CloMappingSection = z.object({
 });
 export type CloMappingSection = z.infer<typeof CloMappingSection>;
 
+/* --------------------------------------- §16 Distribution of Student Learning Time */
+
+/** One hour value per activity (L/T/P/O). Absent = 0. Ints 0–1000. */
+const SltHour = z.coerce.number().int().min(0).max(1000);
+const SltCellRow = z
+  .object({ L: SltHour, T: SltHour, P: SltHour, O: SltHour })
+  .partial();
+export type SltCellRow = z.infer<typeof SltCellRow>;
+
+/** The 12-cell breakdown for one row: three delivery modes × L/T/P/O. */
+export const SltCells = z
+  .object({
+    physical: SltCellRow.default({}),
+    online: SltCellRow.default({}),
+    independent: SltCellRow.default({}),
+  })
+  .default({ physical: {}, online: {}, independent: {} });
+export type SltCells = z.infer<typeof SltCells>;
+
+/**
+ * Assessment rows carry hours per delivery mode only — no L/T/P/O activity
+ * breakdown (per the RUPP §16 assessment tables). Absent = 0.
+ */
+export const SltModeHours = z
+  .object({ physical: SltHour, online: SltHour, independent: SltHour })
+  .partial();
+export type SltModeHours = z.infer<typeof SltModeHours>;
+
+/** A §16 course-content topic row. `cloCode` references a §14 CLO. */
+export const SltTopicRow = z.object({
+  id: z.string().min(1),
+  title: z.string().default(""),
+  cloCode: z.string().nullable().default(null),
+  cells: SltCells,
+});
+export type SltTopicRow = z.infer<typeof SltTopicRow>;
+
+/**
+ * A §16 assessment row (continuous or final). No CLO. `weight` (%) is derived
+ * from the row's share of total assessment SLT. Hours are per delivery mode only.
+ */
+export const SltAssessmentRow = z.object({
+  id: z.string().min(1),
+  title: z.string().default(""),
+  weight: z.coerce.number().int().min(0).max(100).nullable().default(null),
+  hours: SltModeHours.default({}),
+});
+export type SltAssessmentRow = z.infer<typeof SltAssessmentRow>;
+
+export const SltSection = z.object({
+  content: z.array(SltTopicRow).default([]),
+  continuous: z.array(SltAssessmentRow).default([]),
+  final: z.array(SltAssessmentRow).default([]),
+});
+export type SltSection = z.infer<typeof SltSection>;
+
+/** Sum every hour cell in a row (all modes × L/T/P/O). */
+export function rowTotal(cells: SltCells): number {
+  const modes = [cells.physical, cells.online, cells.independent];
+  return modes.reduce(
+    (sum, m) => sum + (m.L ?? 0) + (m.T ?? 0) + (m.P ?? 0) + (m.O ?? 0),
+    0,
+  );
+}
+
+/** Sum an assessment row's per-mode hours (no L/T/P/O breakdown). */
+export function modeHoursTotal(hours: SltModeHours): number {
+  return (hours.physical ?? 0) + (hours.online ?? 0) + (hours.independent ?? 0);
+}
+
+/** Content-topic hours summed per CLO. Rows without a cloCode are ignored. */
+export function perCloSlt(content: SltTopicRow[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const row of content) {
+    if (!row.cloCode) continue;
+    out[row.cloCode] = (out[row.cloCode] ?? 0) + rowTotal(row.cells);
+  }
+  return out;
+}
+
+/** The §16 footer cascade: content + assessment totals → grand total. */
+export function sltSectionTotals(section: SltSection) {
+  const contentTotal = section.content.reduce((s, r) => s + rowTotal(r.cells), 0);
+  const continuousTotal = section.continuous.reduce((s, r) => s + modeHoursTotal(r.hours), 0);
+  const finalTotal = section.final.reduce((s, r) => s + modeHoursTotal(r.hours), 0);
+  const assessmentTotal = continuousTotal + finalTotal;
+  return {
+    contentTotal,
+    continuousTotal,
+    finalTotal,
+    assessmentTotal,
+    grandTotal: contentTotal + assessmentTotal,
+  };
+}
+
 /** Zod schema for a given section id. Extend as later phases add sections. */
 export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
   courseInfo: CourseInfoSection,
   clos: ClosSection,
   cloMapping: CloMappingSection,
+  slt: SltSection,
 };
 
 /* ------------------------------------------------------------- spec envelope */

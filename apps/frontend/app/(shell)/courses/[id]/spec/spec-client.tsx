@@ -5,12 +5,12 @@ import Link from "next/link";
 import {
   SPEC_SECTIONS,
   type Method,
-  type MethodKind,
   type SpecSectionId,
   type SpecSectionStatus,
 } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
+import { coursesApi } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
 import { methodsApi } from "@/lib/methods";
 import {
@@ -35,6 +35,13 @@ import {
   type CloMappingForm,
 } from "./clo-mapping-section";
 import { ProgrammeSection } from "./programme-section";
+import {
+  SltSectionForm,
+  EMPTY_SLT,
+  toSltForm,
+  toSltPayload,
+  type SltForm,
+} from "./slt-section";
 
 export function SpecClient({ courseId }: { courseId: string }) {
   const [activeId, setActiveId] = useState<SpecSectionId>("courseInfo");
@@ -42,6 +49,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
   const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
+  const [slt, setSlt] = useState<SltForm>(EMPTY_SLT);
+  const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,31 +62,25 @@ export function SpecClient({ courseId }: { courseId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [spec, methods] = await Promise.all([
+      const [spec, methods, course] = await Promise.all([
         courseSpecApi.get(courseId),
         methodsApi.list(),
+        coursesApi.get(courseId),
       ]);
       setCourseInfo(toCourseInfoForm(spec.data.courseInfo as Record<string, unknown> | undefined));
       setClos(toClosForm(spec.data.clos));
       setCloMapping(toCloMappingForm(spec.data.cloMapping));
+      setSlt(toSltForm(spec.data.slt));
       setStatus(spec.status ?? {});
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
+      setCourseTotalSlt(course.totalSltHours ?? null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load the course specification");
     } finally {
       setLoading(false);
     }
   }, [courseId]);
-
-  const sortByName = (list: Method[]) => [...list].sort((a, b) => a.name.localeCompare(b.name));
-
-  const handleAddMethod = useCallback(async (kind: MethodKind, name: string): Promise<Method> => {
-    const method = await methodsApi.add(kind, name);
-    const setter = kind === "teaching" ? setTeachingMethods : setAssessmentMethods;
-    setter((list) => (list.some((m) => m.id === method.id) ? list : sortByName([...list, method])));
-    return method;
-  }, []);
 
   useEffect(() => {
     load();
@@ -104,7 +107,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
       } else if (activeId === "cloMapping") {
         const reconciled = reconcileMapping(clos, cloMapping);
         setCloMapping(reconciled);
-        await courseSpecApi.saveSection(courseId, "cloMapping", toCloMappingPayload(reconciled));
+        await courseSpecApi.saveSection(
+          courseId,
+          "cloMapping",
+          toCloMappingPayload(reconciled, courseTotalSlt),
+        );
+      } else if (activeId === "slt") {
+        await courseSpecApi.saveSection(courseId, "slt", toSltPayload(slt));
       }
       setStatus((s) => ({ ...s, [activeId]: "complete" }));
       setSavedFlash(true);
@@ -201,8 +210,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
               onChange={setCloMapping}
               teachingMethods={teachingMethods}
               assessmentMethods={assessmentMethods}
-              onAddMethod={handleAddMethod}
+              courseTotalSlt={courseTotalSlt}
             />
+          ) : activeId === "slt" ? (
+            <SltSectionForm value={slt} onChange={setSlt} clos={clos} />
           ) : (
             <ComingSoon title={activeMeta?.title ?? ""} refLabel={activeMeta?.ref ?? ""} />
           )}

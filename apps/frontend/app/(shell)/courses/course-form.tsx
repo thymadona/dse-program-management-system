@@ -31,6 +31,7 @@ export type CourseFormValues = {
   credits?: number | null;
   prerequisites?: string;
   courseType?: CourseType | null;
+  totalSltHours?: number | null;
 };
 
 interface CourseFormProps {
@@ -66,6 +67,7 @@ export function CourseForm({
   // submits as null rather than tripping the shared input resolver.
   const [credits, setCredits] = useState<string>("");
   const [courseType, setCourseType] = useState<string>("");
+  const [totalSltHours, setTotalSltHours] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -82,6 +84,7 @@ export function CourseForm({
       );
       setCredits(editing?.credits != null ? String(editing.credits) : "");
       setCourseType(editing?.courseType ?? "");
+      setTotalSltHours(editing?.totalSltHours != null ? String(editing.totalSltHours) : "");
     }
   }, [open, editing, reset]);
 
@@ -104,6 +107,7 @@ export function CourseForm({
               prerequisites: values.prerequisites?.trim() || undefined,
               credits: credits ? Number(credits) : null,
               courseType: (courseType || null) as CourseType | null,
+              totalSltHours: totalSltHours ? Number(totalSltHours) : null,
             });
           })}
           className="space-y-4"
@@ -117,7 +121,7 @@ export function CourseForm({
           <Field label="Description" error={errors.description?.message}>
             <Input placeholder="Optional" {...register("description")} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Field label="Credits (§4)">
               <Input
                 type="number"
@@ -126,6 +130,15 @@ export function CourseForm({
                 placeholder="3"
                 value={credits}
                 onChange={(e) => setCredits(e.target.value)}
+              />
+            </Field>
+            <Field label="Total SLT (hours)">
+              <Input
+                type="number"
+                min={0}
+                placeholder="120"
+                value={totalSltHours}
+                onChange={(e) => setTotalSltHours(e.target.value)}
               />
             </Field>
             <Field label="Course type (§11)">

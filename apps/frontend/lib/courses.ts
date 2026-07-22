@@ -9,6 +9,9 @@ export const coursesApi = {
     const qs = search ? `?search=${encodeURIComponent(search)}` : "";
     return api.get<CourseView[]>(`/api/courses${qs}`);
   },
+  get(id: string): Promise<CourseView> {
+    return api.get<CourseView>(`/api/courses/${id}`);
+  },
   create(input: CreateCourseInput): Promise<CourseView> {
     return api.post<CourseView>("/api/courses", input);
   },

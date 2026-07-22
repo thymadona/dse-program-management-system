@@ -1,6 +1,6 @@
 "use client";
 
-import { FOCUS_LEVELS, type Method, type MethodKind } from "@dse-pms/shared-types";
+import { FOCUS_LEVELS, type Method } from "@dse-pms/shared-types";
 import { ReferenceGuide } from "./reference-guide";
 import { MethodChecklist } from "./method-checklist";
 import type { CloForm } from "./clos-section";
@@ -53,13 +53,8 @@ export function reconcileMapping(clos: CloForm[], saved: CloMappingForm[]): CloM
   return clos.map((clo) => byCode.get(clo.code) ?? blankMapping(clo.code));
 }
 
-/** Total SLT across the section: the sum of every CLO's SLT hours. */
-export function totalSlt(rows: CloMappingForm[]): number {
-  return rows.reduce((sum, r) => sum + (Number(r.sltHours) || 0), 0);
-}
-
 /** A CLO's share of the total SLT, as a whole percent. `null` when not yet computable. */
-export function focusPercentOf(sltHours: string, total: number): number | null {
+export function focusPercentOf(sltHours: string, total: number | null): number | null {
   const hours = Number(sltHours);
   if (!total || !hours) return null;
   return Math.round((hours / total) * 100);
@@ -75,10 +70,11 @@ export function focusCodeOf(percent: number | null): string {
 
 /**
  * Convert the reconciled rows into the CloMappingSection payload the API validates.
- * Focus % and its F/M/P category are derived from each CLO's share of the total SLT.
+ * SLT hours are entered by the lecturer per CLO; focus % and its F/M/P category are
+ * derived from each CLO's share of the course's total SLT.
  */
-export function toCloMappingPayload(rows: CloMappingForm[]) {
-  const total = totalSlt(rows);
+export function toCloMappingPayload(rows: CloMappingForm[], courseTotalSlt: number | null) {
+  const total = courseTotalSlt;
   return {
     items: rows.map((f) => {
       const percent = focusPercentOf(f.sltHours, total);
@@ -100,17 +96,19 @@ export function CloMappingSection({
   onChange,
   teachingMethods,
   assessmentMethods,
-  onAddMethod,
+  courseTotalSlt,
 }: {
   clos: CloForm[];
   value: CloMappingForm[];
   onChange: (rows: CloMappingForm[]) => void;
   teachingMethods: Method[];
   assessmentMethods: Method[];
-  onAddMethod: (kind: MethodKind, name: string) => Promise<Method>;
+  courseTotalSlt: number | null;
 }) {
   const rows = reconcileMapping(clos, value);
-  const total = totalSlt(rows);
+  const total = courseTotalSlt;
+  const assignedTotal = rows.reduce((s, r) => s + (Number(r.sltHours) || 0), 0);
+  const sltMismatch = total != null && assignedTotal !== total;
 
   const update = (index: number, patch: Partial<CloMappingForm>) => {
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -130,16 +128,34 @@ export function CloMappingSection({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        For each CLO, record the Student Learning Time spent on its PLO, plus the teaching and
-        assessment methods used. Focus % and its F/M/P category are calculated automatically from
-        each CLO&apos;s share of the total SLT. The PLO and C/A/P level are carried over from §14.
+        For each CLO, enter the Student Learning Time spent on its PLO, plus the teaching and
+        assessment methods used. The SLT hours you assign across CLOs must add up to the course&apos;s
+        total SLT. Focus % and its F/M/P category are calculated automatically from each CLO&apos;s
+        share of that total. The PLO and C/A/P level are carried over from §14.
       </p>
 
       <ReferenceGuide title="Focus on PLO (F / M / P)" rows={[...FOCUS_LEVELS]} />
 
-      <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
-        <span className="text-muted-foreground">Total SLT (sum of CLO hours)</span>
-        <span className="font-semibold text-foreground">{total} h</span>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
+          <span className="text-muted-foreground">Total SLT (course)</span>
+          {total != null ? (
+            <span className="font-semibold text-foreground">{total} h</span>
+          ) : (
+            <span className="text-muted-foreground">— set it on the course</span>
+          )}
+        </div>
+        <div className="flex items-center justify-between px-3 text-sm">
+          <span className="text-muted-foreground">Assigned across CLOs</span>
+          <span className={sltMismatch ? "font-semibold text-amber-600" : "font-medium text-foreground"}>
+            {assignedTotal} h
+          </span>
+        </div>
+        {sltMismatch ? (
+          <p className="px-3 text-xs text-amber-600">
+            ⚠ CLO SLT hours add up to {assignedTotal} h but the course total SLT is {total} h — they must match.
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-4">
@@ -203,7 +219,6 @@ export function CloMappingSection({
                 options={teachingMethods}
                 selectedIds={row.teachingMethodIds}
                 onChange={(ids) => update(i, { teachingMethodIds: ids })}
-                onAdd={(name) => onAddMethod("teaching", name)}
               />
 
               <MethodChecklist
@@ -211,7 +226,6 @@ export function CloMappingSection({
                 options={assessmentMethods}
                 selectedIds={row.assessmentMethodIds}
                 onChange={(ids) => update(i, { assessmentMethodIds: ids })}
-                onAdd={(name) => onAddMethod("assessment", name)}
               />
             </fieldset>
           );
