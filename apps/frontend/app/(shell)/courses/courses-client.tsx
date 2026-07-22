@@ -80,6 +80,16 @@ export function CoursesClient() {
         c.credits != null ? c.credits : <span className="text-muted-foreground">—</span>,
     },
     {
+      key: "totalSltHours",
+      header: "Total SLT",
+      render: (c) =>
+        c.totalSltHours != null ? (
+          `${c.totalSltHours} h`
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
       key: "courseType",
       header: "Type",
       render: (c) =>

@@ -53,13 +53,8 @@ export function reconcileMapping(clos: CloForm[], saved: CloMappingForm[]): CloM
   return clos.map((clo) => byCode.get(clo.code) ?? blankMapping(clo.code));
 }
 
-/** Total SLT across the section: the sum of every CLO's SLT hours. */
-export function totalSlt(rows: CloMappingForm[]): number {
-  return rows.reduce((sum, r) => sum + (Number(r.sltHours) || 0), 0);
-}
-
 /** A CLO's share of the total SLT, as a whole percent. `null` when not yet computable. */
-export function focusPercentOf(sltHours: string, total: number): number | null {
+export function focusPercentOf(sltHours: string, total: number | null): number | null {
   const hours = Number(sltHours);
   if (!total || !hours) return null;
   return Math.round((hours / total) * 100);
@@ -75,14 +70,19 @@ export function focusCodeOf(percent: number | null): string {
 
 /**
  * Convert the reconciled rows into the CloMappingSection payload the API validates.
- * Focus % and its F/M/P category are derived from each CLO's share of the total SLT.
+ * Focus % and its F/M/P category are derived from each CLO's share of the course's
+ * admin-entered total SLT.
  */
-export function toCloMappingPayload(rows: CloMappingForm[], sltByClo?: Record<string, number>) {
+export function toCloMappingPayload(
+  rows: CloMappingForm[],
+  sltByClo: Record<string, number> | undefined,
+  courseTotalSlt: number | null,
+) {
   const effective = rows.map((r) => {
     const derived = sltByClo?.[r.cloCode];
     return derived != null ? { ...r, sltHours: String(derived) } : r;
   });
-  const total = totalSlt(effective);
+  const total = courseTotalSlt;
   return {
     items: effective.map((f) => {
       const percent = focusPercentOf(f.sltHours, total);
@@ -105,6 +105,7 @@ export function CloMappingSection({
   teachingMethods,
   assessmentMethods,
   sltByClo,
+  courseTotalSlt,
 }: {
   clos: CloForm[];
   value: CloMappingForm[];
@@ -112,11 +113,12 @@ export function CloMappingSection({
   teachingMethods: Method[];
   assessmentMethods: Method[];
   sltByClo?: Record<string, number>;
+  courseTotalSlt: number | null;
 }) {
   const rows = reconcileMapping(clos, value);
   const effectiveHours = (row: CloMappingForm) =>
     sltByClo?.[row.cloCode] != null ? String(sltByClo[row.cloCode]) : row.sltHours;
-  const total = rows.reduce((sum, r) => sum + (Number(effectiveHours(r)) || 0), 0);
+  const total = courseTotalSlt;
 
   const update = (index: number, patch: Partial<CloMappingForm>) => {
     onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
@@ -138,14 +140,19 @@ export function CloMappingSection({
       <p className="text-sm text-muted-foreground">
         For each CLO, record the Student Learning Time spent on its PLO, plus the teaching and
         assessment methods used. Focus % and its F/M/P category are calculated automatically from
-        each CLO&apos;s share of the total SLT. The PLO and C/A/P level are carried over from §14.
+        each CLO&apos;s share of the course&apos;s total SLT. The PLO and C/A/P level are carried
+        over from §14.
       </p>
 
       <ReferenceGuide title="Focus on PLO (F / M / P)" rows={[...FOCUS_LEVELS]} />
 
       <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
-        <span className="text-muted-foreground">Total SLT (sum of CLO hours)</span>
-        <span className="font-semibold text-foreground">{total} h</span>
+        <span className="text-muted-foreground">Total SLT (course)</span>
+        {total != null ? (
+          <span className="font-semibold text-foreground">{total} h</span>
+        ) : (
+          <span className="text-muted-foreground">— set it on the course</span>
+        )}
       </div>
 
       <div className="space-y-4">

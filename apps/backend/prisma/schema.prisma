@@ -87,6 +87,9 @@ model Course {
   credits       Int?
   prerequisites String?
   courseType    CourseType?
+  // Admin-entered total Student Learning Time for the course (hours). Independent of
+  // §16 — always a direct input, never derived. Used as the §15 Focus % denominator.
+  totalSltHours Int?
   createdAt   DateTime @default(now())
 
   offerings Offering[]

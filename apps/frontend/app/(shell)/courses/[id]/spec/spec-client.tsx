@@ -11,6 +11,7 @@ import {
 } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
+import { coursesApi } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
 import { methodsApi } from "@/lib/methods";
 import {
@@ -50,6 +51,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
   const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
   const [slt, setSlt] = useState<SltForm>(EMPTY_SLT);
+  const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,9 +63,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const [spec, methods] = await Promise.all([
+      const [spec, methods, course] = await Promise.all([
         courseSpecApi.get(courseId),
         methodsApi.list(),
+        coursesApi.get(courseId),
       ]);
       setCourseInfo(toCourseInfoForm(spec.data.courseInfo as Record<string, unknown> | undefined));
       setClos(toClosForm(spec.data.clos));
@@ -72,6 +75,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setStatus(spec.status ?? {});
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
+      setCourseTotalSlt(course.totalSltHours ?? null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load the course specification");
     } finally {
@@ -106,7 +110,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
       } else if (activeId === "cloMapping") {
         const reconciled = reconcileMapping(clos, cloMapping);
         setCloMapping(reconciled);
-        await courseSpecApi.saveSection(courseId, "cloMapping", toCloMappingPayload(reconciled, sltByClo));
+        await courseSpecApi.saveSection(
+          courseId,
+          "cloMapping",
+          toCloMappingPayload(reconciled, sltByClo, courseTotalSlt),
+        );
       } else if (activeId === "slt") {
         await courseSpecApi.saveSection(courseId, "slt", toSltPayload(slt));
       }
@@ -206,6 +214,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               teachingMethods={teachingMethods}
               assessmentMethods={assessmentMethods}
               sltByClo={sltByClo}
+              courseTotalSlt={courseTotalSlt}
             />
           ) : activeId === "slt" ? (
             <SltSectionForm value={slt} onChange={setSlt} clos={clos} />

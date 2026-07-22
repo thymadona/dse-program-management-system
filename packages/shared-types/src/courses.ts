@@ -37,6 +37,9 @@ export const CourseSchema = z.object({
   credits: z.number().int().nullable().optional(),
   prerequisites: z.string().nullable().optional(),
   courseType: CourseTypeSchema.nullable().optional(),
+  // Admin-entered total SLT (hours) for the course. Independent of §16 — always a
+  // direct input, never derived. Used as the §15 Focus % denominator.
+  totalSltHours: z.number().int().nullable().optional(),
   createdAt: z.string().datetime(),
 });
 export type Course = z.infer<typeof CourseSchema>;
@@ -50,6 +53,7 @@ export const CreateCourseInput = z.object({
   credits: z.coerce.number().int().min(1).max(30).nullable().optional(),
   prerequisites: z.string().optional(),
   courseType: CourseTypeSchema.nullable().optional(),
+  totalSltHours: z.coerce.number().int().min(0).nullable().optional(),
 });
 export type CreateCourseInput = z.infer<typeof CreateCourseInput>;
 
