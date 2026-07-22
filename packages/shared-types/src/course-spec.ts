@@ -231,11 +231,56 @@ export const CloMappingSection = z.object({
 });
 export type CloMappingSection = z.infer<typeof CloMappingSection>;
 
+/* --------------------------------------- §16 Distribution of Student Learning Time */
+
+/** One hour value per activity (L/T/P/O). Absent = 0. Ints 0–1000. */
+const SltHour = z.coerce.number().int().min(0).max(1000);
+const SltCellRow = z
+  .object({ L: SltHour, T: SltHour, P: SltHour, O: SltHour })
+  .partial();
+export type SltCellRow = z.infer<typeof SltCellRow>;
+
+/** The 12-cell breakdown for one row: three delivery modes × L/T/P/O. */
+export const SltCells = z
+  .object({
+    physical: SltCellRow.default({}),
+    online: SltCellRow.default({}),
+    independent: SltCellRow.default({}),
+  })
+  .default({ physical: {}, online: {}, independent: {} });
+export type SltCells = z.infer<typeof SltCells>;
+
+/** A §16 course-content topic row. `cloCode` references a §14 CLO. */
+export const SltTopicRow = z.object({
+  id: z.string().min(1),
+  title: z.string().default(""),
+  cloCode: z.string().nullable().default(null),
+  cells: SltCells,
+});
+export type SltTopicRow = z.infer<typeof SltTopicRow>;
+
+/** A §16 assessment row (continuous or final). No CLO; carries a % weight. */
+export const SltAssessmentRow = z.object({
+  id: z.string().min(1),
+  title: z.string().default(""),
+  weight: z.coerce.number().int().min(0).max(100).nullable().default(null),
+  cells: SltCells,
+});
+export type SltAssessmentRow = z.infer<typeof SltAssessmentRow>;
+
+export const SltSection = z.object({
+  content: z.array(SltTopicRow).default([]),
+  continuous: z.array(SltAssessmentRow).default([]),
+  final: z.array(SltAssessmentRow).default([]),
+});
+export type SltSection = z.infer<typeof SltSection>;
+
 /** Zod schema for a given section id. Extend as later phases add sections. */
 export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
   courseInfo: CourseInfoSection,
   clos: ClosSection,
   cloMapping: CloMappingSection,
+  slt: SltSection,
 };
 
 /* ------------------------------------------------------------- spec envelope */
