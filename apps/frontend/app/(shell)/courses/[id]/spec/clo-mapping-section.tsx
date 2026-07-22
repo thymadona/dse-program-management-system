@@ -116,9 +116,8 @@ export function CloMappingSection({
   sltByClo?: Record<string, number>;
 }) {
   const rows = reconcileMapping(clos, value);
-  const hasDerived = !!sltByClo && Object.keys(sltByClo).length > 0;
   const effectiveHours = (row: CloMappingForm) =>
-    hasDerived && sltByClo![row.cloCode] != null ? String(sltByClo![row.cloCode]) : row.sltHours;
+    sltByClo?.[row.cloCode] != null ? String(sltByClo[row.cloCode]) : row.sltHours;
   const total = rows.reduce((sum, r) => sum + (Number(effectiveHours(r)) || 0), 0);
 
   const update = (index: number, patch: Partial<CloMappingForm>) => {
@@ -160,6 +159,7 @@ export function CloMappingSection({
           const percent = focusPercentOf(hours, total);
           const focusCode = focusCodeOf(percent);
           const focusName = FOCUS_LEVELS.find((f) => f.code === focusCode)?.name;
+          const derivedHours = sltByClo?.[row.cloCode];
           return (
             <fieldset key={row.cloCode} className="space-y-3 rounded-lg border border-border p-4">
               <legend className="flex flex-wrap items-center gap-2 px-1">
@@ -179,12 +179,12 @@ export function CloMappingSection({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="block space-y-1.5">
                   <span className="text-sm font-medium text-foreground">SLT hours on PLO</span>
-                  {hasDerived ? (
+                  {derivedHours != null ? (
                     <div
                       className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
                       title="Summed from §16 topic hours for this CLO"
                     >
-                      {sltByClo![row.cloCode] ?? 0} h · from §16
+                      {derivedHours} h · from §16
                     </div>
                   ) : (
                     <input
