@@ -1,10 +1,14 @@
 import jwt from "jsonwebtoken";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
 /**
- * Local HS256 token helpers. This is the single swap-point for auth: replacing
- * local dev auth with Supabase means verifying Supabase's JWT here (RS256 via
- * their JWKS) — nothing else in the app changes, because every route depends
- * only on the `AuthUser` shape produced below.
+ * The single swap-point for auth. Two schemes coexist behind `AUTH_MODE`:
+ * - `dev`: local HS256 tokens minted by `signToken` / `gen-token` (JWT_SECRET).
+ * - `supabase`: JWTs issued by Supabase Auth, verified against the project's
+ *   JWKS in `verifySupabaseToken`.
+ * Nothing else in the app changes when switching, because every route depends
+ * only on the `AuthUser` shape — and in supabase mode the caller's *role* is
+ * resolved from our own `User` table, not trusted from a token claim.
  */
 
 export type Role = "admin" | "lecturer" | "student";
@@ -13,6 +17,18 @@ export interface AuthUser {
   id: string;
   email: string;
   role: Role;
+}
+
+/**
+ * Which auth scheme the backend verifies against.
+ * - `dev` (default): local HS256 dev tokens minted by `gen-token` / `signToken`.
+ * - `supabase`: JWTs issued by Supabase Auth, verified in `verifySupabaseToken`.
+ * Kept as a flag so local dev and CI run without a live Supabase project.
+ */
+export type AuthMode = "dev" | "supabase";
+
+export function getAuthMode(): AuthMode {
+  return process.env.AUTH_MODE === "supabase" ? "supabase" : "dev";
 }
 
 function getSecret(): string {
@@ -43,4 +59,39 @@ export function verifyToken(token: string): AuthUser {
     email: payload.email,
     role: payload.role as Role,
   };
+}
+
+/** Identity extracted from a verified Supabase token — role comes from our DB, not here. */
+export interface SupabaseIdentity {
+  authId: string;
+  email: string;
+}
+
+// Cache the remote JWKS across requests (it fetches + caches signing keys internally).
+let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
+
+function getJwks(): ReturnType<typeof createRemoteJWKSet> {
+  const url = process.env.SUPABASE_JWKS_URL;
+  if (!url) {
+    throw new Error(
+      "SUPABASE_JWKS_URL is not set. In AUTH_MODE=supabase it must point at " +
+        "https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json",
+    );
+  }
+  jwks ??= createRemoteJWKSet(new URL(url));
+  return jwks;
+}
+
+/**
+ * Verifies a Supabase-issued JWT against the project's JWKS (asymmetric keys)
+ * and returns only the identity (auth uid + email). Authorization role is looked
+ * up from our own `User` table by the caller, so Supabase metadata can never
+ * escalate a role. Throws if the token is invalid/expired or missing claims.
+ */
+export async function verifySupabaseToken(token: string): Promise<SupabaseIdentity> {
+  const { payload } = await jwtVerify(token, getJwks());
+  if (!payload.sub || typeof payload.email !== "string") {
+    throw new Error("Malformed Supabase token payload");
+  }
+  return { authId: payload.sub, email: payload.email };
 }

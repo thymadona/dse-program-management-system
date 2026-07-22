@@ -1,7 +1,8 @@
 # Deploying DSE-PMS for client review (Phase 1)
 
-Three services, deployed in this order. Auth stays on the temporary dev bearer
-token for this review — no Supabase Auth yet.
+Three services, deployed in this order. Auth runs in one of two modes via
+`AUTH_MODE`: the temporary dev bearer token (default, this Phase 1 guide), or real
+Supabase Auth (see §5). Start on the dev token to get the demo live, then switch.
 
 ```
 Supabase (Postgres)  →  Render (backend API)  →  Vercel (Next.js frontend)
@@ -71,8 +72,35 @@ Paste that token into Vercel's `NEXT_PUBLIC_DEV_TOKEN` and redeploy the frontend
 Tokens are valid 7 days; re-run `gen-token` from the Render Shell to refresh.
 
 > This is shared, admin-level access for the review — anyone with the site can
-> act as admin. That's intentional for a Phase 1 demo. Real Supabase Auth is the
-> next phase.
+> act as admin. That's intentional for a Phase 1 demo. Real Supabase Auth (§5)
+> replaces it.
+
+## 5. Supabase Auth (Phase 2)
+
+Switches the app from the shared dev token to per-user login. Roles come from our
+own `User.role` (not Supabase metadata), so authorization stays auditable in
+`core/permissions`. Only admins can provision lecturer accounts.
+
+1. **Enable Email auth** in the Supabase dashboard (Authentication → Providers →
+   Email). Configure the invite email template and set its redirect URL to
+   `https://<your-vercel-url>/auth/callback`.
+2. **Backend env (Render)** — set:
+   - `AUTH_MODE=supabase`
+   - `SUPABASE_JWKS_URL=https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`
+   - `SUPABASE_URL=https://<ref>.supabase.co`
+   - `SUPABASE_SERVICE_ROLE_KEY` — **secret**; never exposed to the browser.
+   - `SUPABASE_INVITE_REDIRECT_URL=https://<your-vercel-url>/auth/callback`
+3. **Frontend env (Vercel)** — set:
+   - `NEXT_PUBLIC_AUTH_MODE=supabase`
+   - `NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>`
+   (`NEXT_PUBLIC_DEV_TOKEN` is ignored in supabase mode.)
+4. **Provision the first admin.** The seeded `admin@dse.dev` `User` row already has
+   `role=admin`; invite that email (Supabase dashboard → Add user → send invite, or
+   `admin.createUser`). On first login it links to the existing row by email.
+5. **Admins create lecturers** in-app: Lecturers page → **Create login account** →
+   name + email → Supabase sends the invite; the lecturer sets a password at
+   `/auth/callback` and can sign in. `gen-token` is dev-mode only from here on.
 
 ---
 

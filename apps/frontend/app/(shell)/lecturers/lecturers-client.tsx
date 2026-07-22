@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { Lecturer } from "@dse-pms/shared-types";
-import { DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
+import { Button, DataTable, StatusBadge, TableToolbar, type DataTableColumn } from "@dse-pms/ui";
 import { lecturersApi } from "@/lib/lecturers";
+import { authApi } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { LecturerForm, type LecturerFormValues } from "./lecturer-form";
+import { CreateAccountForm, type CreateAccountValues } from "./create-account-form";
 
 export function LecturersClient() {
   const [rows, setRows] = useState<Lecturer[]>([]);
@@ -16,6 +18,11 @@ export function LecturersClient() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lecturer | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,6 +40,29 @@ export function LecturersClient() {
     const t = setTimeout(load, 200);
     return () => clearTimeout(t);
   }, [load]);
+
+  useEffect(() => {
+    authApi
+      .me()
+      .then((me) => setIsAdmin(me.role === "admin"))
+      .catch(() => setIsAdmin(false));
+  }, []);
+
+  const handleInvite = async (values: CreateAccountValues) => {
+    setInviting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      await authApi.createAccount({ ...values, role: "lecturer" });
+      setAccountOpen(false);
+      setNotice(`Invite sent to ${values.email}.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to create account");
+    } finally {
+      setInviting(false);
+    }
+  };
 
   const handleSubmit = async (values: LecturerFormValues) => {
     setSubmitting(true);
@@ -96,20 +126,35 @@ export function LecturersClient() {
         qualification and telephone auto-fill the instructor block on course syllabi.
       </p>
 
-      <TableToolbar
-        search={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Search lecturers…"
-        addLabel="Add Lecturer"
-        onAdd={() => {
-          setEditing(null);
-          setFormOpen(true);
-        }}
-      />
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex-1">
+          <TableToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search lecturers…"
+            addLabel="Add Lecturer"
+            onAdd={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          />
+        </div>
+        {isAdmin ? (
+          <Button variant="outline" onClick={() => setAccountOpen(true)}>
+            Create login account
+          </Button>
+        ) : null}
+      </div>
 
       {error ? (
         <div className="rounded-lg border border-status-upcoming bg-status-upcoming-bg px-4 py-2 text-sm text-status-upcoming">
           {error}
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="rounded-lg border border-status-live bg-status-live-bg px-4 py-2 text-sm text-status-live">
+          {notice}
         </div>
       ) : null}
 
@@ -135,6 +180,13 @@ export function LecturersClient() {
         editing={editing}
         onSubmit={handleSubmit}
         submitting={submitting}
+      />
+
+      <CreateAccountForm
+        open={accountOpen}
+        onOpenChange={setAccountOpen}
+        onSubmit={handleInvite}
+        submitting={inviting}
       />
     </div>
   );

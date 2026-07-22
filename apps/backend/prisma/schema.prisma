@@ -48,6 +48,7 @@ enum CourseType {
 /// title/qualification/phone feed the syllabus "Course Details" instructor block.
 model User {
   id            String   @id @default(uuid())
+  authId        String?  @unique
   email         String   @unique
   name          String
   role          Role     @default(student)

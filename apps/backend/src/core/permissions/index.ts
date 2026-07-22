@@ -8,6 +8,7 @@ import type { Role } from "../auth/token.ts";
  */
 const ROLE_PERMISSIONS: Record<Role, string[]> = {
   admin: [
+    "accounts:create",
     "students:read",
     "students:write",
     "courses:read",
