@@ -20,7 +20,7 @@ const ACTS = SLT_ACTIVITIES.map((a) => a.code as ActCode);
 /** String-based cell grid for input binding: cells[mode][act] = "2". */
 export type CellForm = Record<ModeKey, Partial<Record<ActCode, string>>>;
 export type TopicRowForm = { id: string; title: string; cloCode: string; cells: CellForm };
-export type AssessmentRowForm = { id: string; title: string; weight: string; cells: CellForm };
+export type AssessmentRowForm = { id: string; title: string; cells: CellForm };
 export type SltForm = {
   content: TopicRowForm[];
   continuous: AssessmentRowForm[];
@@ -32,7 +32,7 @@ export const EMPTY_SLT: SltForm = { content: [], continuous: [], final: [] };
 const blankCells = (): CellForm => ({ physical: {}, online: {}, independent: {} });
 const uuid = () => globalThis.crypto.randomUUID();
 export const blankTopic = (): TopicRowForm => ({ id: uuid(), title: "", cloCode: "", cells: blankCells() });
-export const blankAssessment = (): AssessmentRowForm => ({ id: uuid(), title: "", weight: "", cells: blankCells() });
+export const blankAssessment = (): AssessmentRowForm => ({ id: uuid(), title: "", cells: blankCells() });
 
 const str = (v: unknown) => (v == null ? "" : String(v));
 
@@ -57,7 +57,7 @@ export function toSltForm(data: unknown): SltForm {
   const assess = (rows: unknown[] | undefined) =>
     (rows ?? []).map((raw) => {
       const r = (raw ?? {}) as Record<string, unknown>;
-      return { id: str(r.id) || uuid(), title: str(r.title), weight: str(r.weight), cells: cellsToForm(r.cells) };
+      return { id: str(r.id) || uuid(), title: str(r.title), cells: cellsToForm(r.cells) };
     });
   return { content: topics, continuous: assess(d.continuous), final: assess(d.final) };
 }
@@ -74,10 +74,17 @@ function cellsToPayload(cells: CellForm) {
 }
 
 export function toSltPayload(form: SltForm): SltSectionData {
+  const assessmentTotal = [...form.continuous, ...form.final].reduce((s, r) => s + formRowTotal(r.cells), 0);
+  const assess = (r: AssessmentRowForm) => ({
+    id: r.id,
+    title: r.title,
+    weight: assessmentWeight(r.cells, assessmentTotal),
+    cells: cellsToPayload(r.cells),
+  });
   return {
     content: form.content.map((r) => ({ id: r.id, title: r.title, cloCode: r.cloCode || null, cells: cellsToPayload(r.cells) })),
-    continuous: form.continuous.map((r) => ({ id: r.id, title: r.title, weight: r.weight === "" ? null : Number(r.weight), cells: cellsToPayload(r.cells) })),
-    final: form.final.map((r) => ({ id: r.id, title: r.title, weight: r.weight === "" ? null : Number(r.weight), cells: cellsToPayload(r.cells) })),
+    continuous: form.continuous.map(assess),
+    final: form.final.map(assess),
   } as SltSectionData;
 }
 
@@ -86,6 +93,16 @@ function formRowTotal(cells: CellForm): number {
   let n = 0;
   for (const { key } of MODES) for (const act of ACTS) n += Number(cells[key][act] || 0);
   return n;
+}
+
+/**
+ * Auto assessment weight (%): this assessment's SLT hours as a share of the total
+ * assessment SLT (continuous + final). `null` when there are no assessment hours yet.
+ * Not user-editable — parallels §15's auto focus %.
+ */
+function assessmentWeight(cells: CellForm, assessmentTotal: number): number | null {
+  if (!assessmentTotal) return null;
+  return Math.round((formRowTotal(cells) / assessmentTotal) * 100);
 }
 
 function reorder<T>(rows: T[], from: number, to: number): T[] {
@@ -149,8 +166,6 @@ export function SltSectionForm({
   clos: CloForm[];
 }) {
   const totals = sltSectionTotals(toSltPayload(value));
-  const weightSum =
-    [...value.continuous, ...value.final].reduce((s, r) => s + (Number(r.weight) || 0), 0);
   const missingClo = value.content.some((r) => !r.cloCode);
 
   const setContent = (rows: TopicRowForm[]) => onChange({ ...value, content: rows });
@@ -166,8 +181,9 @@ export function SltSectionForm({
       <p className="text-sm text-muted-foreground">
         Distribute each topic&apos;s and assessment&apos;s Student Learning Time across delivery modes
         (Physical, Online, Independent) and activities — Lecture (L), Tutoring (T), Practice (P),
-        Other (O). Totals and the Grand Total SLT are calculated automatically. Content-topic hours
-        also drive each CLO&apos;s SLT in §15.
+        Other (O). Totals and the Grand Total SLT are calculated automatically. Each assessment&apos;s
+        weight is derived from its share of the total assessment SLT. Content-topic hours also drive
+        each CLO&apos;s SLT in §15.
       </p>
 
       {/* -------- Course Content -------- */}
@@ -242,15 +258,15 @@ export function SltSectionForm({
                           onChange={(e) => setGroup(g, rows.map((r, idx) => (idx === i ? { ...r, title: e.target.value } : r)))}
                         />
                       </td>
-                      <td className="px-2 py-1">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          className={inputCls}
-                          value={row.weight}
-                          onChange={(e) => setGroup(g, rows.map((r, idx) => (idx === i ? { ...r, weight: e.target.value } : r)))}
-                        />
+                      <td className="px-2 py-1 text-center">
+                        <span
+                          className="inline-flex h-8 min-w-[3rem] items-center justify-center rounded border border-border bg-muted px-2 text-sm text-muted-foreground"
+                          title="Auto: this assessment's share of total assessment SLT"
+                        >
+                          {assessmentWeight(row.cells, totals.assessmentTotal) == null
+                            ? "—"
+                            : `${assessmentWeight(row.cells, totals.assessmentTotal)}%`}
+                        </span>
                       </td>
                       <CellInputs cells={row.cells} onCell={cellSetter(rows, i, (rs) => setGroup(g, rs))} />
                       <td className="px-2 py-1 text-center font-medium text-foreground">{formRowTotal(row.cells)}</td>
@@ -277,9 +293,6 @@ export function SltSectionForm({
         <TotalRow label="Total SLT for Assessment" value={totals.assessmentTotal} />
         <TotalRow label="Grand Total SLT" value={totals.grandTotal} strong />
       </div>
-      {weightSum !== 100 && (value.continuous.length + value.final.length > 0) ? (
-        <p className="text-xs text-amber-600">⚠ Assessment weights total {weightSum}% (should be 100%).</p>
-      ) : null}
       {missingClo ? (
         <p className="text-xs text-amber-600">⚠ Some topics have no CLO selected.</p>
       ) : null}
