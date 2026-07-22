@@ -7,8 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 DSE Program Management System — a modular monolith with a plugin registry, currently
 implementing the RUPP course-specification syllabus (Part 1 programme reference +
 Part 2 §1–25 course spec wizard) plus Students/Courses/Offerings/Lecturers CRUD.
-Auth is a temporary local JWT dev-token scheme, deliberately isolated so it can be
-swapped for Supabase Auth later without touching plugin code.
+Auth runs in one of two swappable modes behind `AUTH_MODE` — a local JWT dev-token
+scheme for local/CI work, or real Supabase Auth — isolated in `core/auth/*` so plugin
+code never depends on which is active.
 
 ## Commands
 
@@ -17,7 +18,7 @@ bun install                            # install all workspaces
 bun run db:up                          # start Postgres via Docker (docker-compose.yml)
 bun run --cwd apps/backend db:migrate  # apply Prisma migrations (dev)
 bun run seed                           # seed dev users + sample data
-bun run gen-token --role admin         # mint a dev JWT (roles: admin | lecturer | student)
+bun run gen-token --role admin         # AUTH_MODE=dev only: mint a dev JWT (roles: admin | lecturer | student)
 
 bun run dev                            # turbo: backend :4000 + frontend :3000 together
 bun run build                          # turbo: build all workspaces
@@ -31,7 +32,8 @@ Run all of them with `bun test` from the repo root, or scope to one file with
 `bun test src/course-spec.test.ts` from inside `packages/shared-types`.
 `apps/backend` has a `test` script (`bun test`) wired for when it gains tests, but has none yet.
 
-Deploy target/process (Supabase → Render → Vercel, dev-token auth) is documented in `DEPLOY.md`.
+Deploy target/process (Supabase → Render → Vercel, and switching from dev-token to
+Supabase Auth via `AUTH_MODE`) is documented in `DEPLOY.md`.
 
 ## Architecture
 
@@ -46,15 +48,18 @@ Tailwind preset (design tokens); `packages/ui` holds shared React primitives
 
 ### Plugin registry (backend)
 
-Each domain (`students`, `courses`, `offerings`, `lecturers`, `methods`) lives under
-`apps/backend/src/plugins/<id>/` as `index.ts` (exports a `DSEPlugin` — manifest +
-router + service) + `router.ts` + `service.ts`. `core/app.ts` is the only place
+Each domain (`students`, `courses`, `offerings`, `lecturers`, `methods`, `auth`) lives
+under `apps/backend/src/plugins/<id>/` as `index.ts` (exports a `BackendPlugin` — the
+shared `DSEPlugin` contract plus an Express router + service) + `router.ts` +
+`service.ts`. `core/app.ts` is the only place
 plugins are registered (`registry.register(...)`) and is deliberately domain-agnostic:
 it just mounts every registered router at `/api/{id}` and serves `/api/registry` for
 introspection. The frontend sidebar nav (`app/(shell)/sidebar.tsx` via
 `navFromManifests`) is generated from that same manifest list, so a new plugin's nav
 entry appears automatically once its manifest is added to `pluginManifests` in
-`packages/shared-types/src/plugins.ts`.
+`packages/shared-types/src/plugins.ts`. A manifest with no `routes` (like `auth`) is
+registered and permission-gated but gets no sidebar entry — its actions are embedded
+in another page's UI (auth's account-creation lives in the Lecturers page).
 
 **Cross-plugin calls always go through `registry.get('<id>').service`** — never a
 direct import between `plugins/*` directories. This is the in-process equivalent of
@@ -63,17 +68,42 @@ an API call and is what lets a plugin be added or removed without touching other
 
 ### Auth & permissions
 
-`core/auth/token.ts` mints/verifies HS256 JWTs; `core/auth/middleware.ts`
-(`requireAuth`) is the only place a raw token is read and sets `req.user`.
-`core/permissions/index.ts` holds the single `ROLE_PERMISSIONS` map (role →
-permission strings) and the `requirePermission(...)` guard factory — plugins declare
-which permission a route needs, this map is the one auditable place deciding which
-roles hold it. Every plugin router calls `requireAuth` then
-`requirePermission("<id>:read"|"<id>:write")` per route.
+`core/auth/token.ts` is the single swap-point. `getAuthMode()` reads `AUTH_MODE`
+(default `dev`) and the two schemes coexist:
 
-Auth is intentionally swappable: only `token.ts` / `middleware.ts` change when real
-Supabase Auth replaces the dev-token scheme (`lib/api.ts` on the frontend is the
-single place the bearer token is attached, for the same reason).
+- **`dev`** — local HS256 tokens minted by `signToken` / `bun run gen-token` and
+  verified whole by `verifyToken`. The token carries the role. Local dev and CI run
+  in this mode with no live Supabase project.
+- **`supabase`** — real Supabase-issued JWTs, verified against the project JWKS
+  (`SUPABASE_JWKS_URL`) in `verifySupabaseToken`, which returns **identity only**
+  (auth uid + email). The token is **never trusted for role**.
+
+`core/auth/middleware.ts` (`requireAuth`) is the only place a raw token is read; it
+sets `req.user: AuthUser` and every downstream check depends only on that shape. In
+`supabase` mode `resolveSupabaseUser` looks the caller up in our own `User` table (by
+`authId`, falling back to `email` and backfilling `authId` on first login — the
+`user_auth_id` migration added that column), and **`User.role` is the authorization
+source of truth** so Supabase metadata can never escalate a role. A valid Supabase
+login with no provisioned `User` row is a 403 (`UnprovisionedAccountError`).
+
+`core/permissions/index.ts` holds the single `ROLE_PERMISSIONS` map (role → permission
+strings) and the `requirePermission(...)` guard factory — plugins declare which
+permission a route needs, this map is the one auditable place deciding which roles hold
+it. Every plugin router calls `requireAuth` then `requirePermission(...)` per route
+(`"<id>:read"|"<id>:write"`, plus the admin-only `"accounts:create"`).
+
+**Account provisioning** is the `auth` plugin. `GET /api/auth/me` returns the resolved
+caller; `POST /api/auth/accounts` (admin-only, `accounts:create`) creates a lecturer
+login via the Supabase **Admin API** (`inviteUserByEmail`, using the server-only
+`SUPABASE_SERVICE_ROLE_KEY` — never shipped to the browser) and links it to an app
+`User` row. There is no self-signup.
+
+On the frontend, `lib/api.ts` is the single place the bearer token is attached:
+`lib/supabase.ts` exposes `AUTH_MODE` (from `NEXT_PUBLIC_AUTH_MODE`) and a lazily-built
+browser client, so `dev` mode uses the static `NEXT_PUBLIC_DEV_TOKEN` and `supabase`
+mode uses the live session access token. Login UI is `app/login/page.tsx`, the
+authenticated shell is gated by `app/(shell)/auth-guard.tsx`, and `lib/auth.ts` wraps
+the `auth` plugin calls (`me`, `createAccount`).
 
 ### Course Specification wizard
 
