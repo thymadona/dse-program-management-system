@@ -81,26 +81,48 @@ Switches the app from the shared dev token to per-user login. Roles come from ou
 own `User.role` (not Supabase metadata), so authorization stays auditable in
 `core/permissions`. Only admins can provision lecturer accounts.
 
-1. **Enable Email auth** in the Supabase dashboard (Authentication → Providers →
-   Email). Configure the invite email template and set its redirect URL to
-   `https://<your-vercel-url>/auth/callback`.
-2. **Backend env (Render)** — set:
+Do these in order — steps 1 and 5 are the ones most often forgotten, and either one
+silently breaks login.
+
+1. **Run the migration on the production DB.** The `authId` column must exist in
+   production, or every authenticated request errors. Against the production
+   `DATABASE_URL` (the Render env, i.e. the Supabase Postgres from step 1 of this
+   guide):
+   ```
+   bun run --cwd apps/backend prisma migrate deploy
+   ```
+2. **Enable Email auth** in the Supabase dashboard (Authentication → Providers →
+   Email) and configure the invite email template.
+3. **Backend env (Render)** — set:
    - `AUTH_MODE=supabase`
    - `SUPABASE_JWKS_URL=https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`
    - `SUPABASE_URL=https://<ref>.supabase.co`
    - `SUPABASE_SERVICE_ROLE_KEY` — **secret**; never exposed to the browser.
    - `SUPABASE_INVITE_REDIRECT_URL=https://<your-vercel-url>/auth/callback`
-3. **Frontend env (Vercel)** — set:
+     ⚠️ Must be the **deployed** frontend URL, **not** `localhost` — this is where an
+     invited lecturer lands to set their password.
+4. **Frontend env (Vercel)** — set:
    - `NEXT_PUBLIC_AUTH_MODE=supabase`
    - `NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>`
    (`NEXT_PUBLIC_DEV_TOKEN` is ignored in supabase mode.)
-4. **Provision the first admin.** The seeded `admin@dse.dev` `User` row already has
+5. **Allow-list the redirect** in Supabase (Authentication → URL Configuration):
+   set Site URL to `https://<your-vercel-url>` and add
+   `https://<your-vercel-url>/auth/callback` to **Redirect URLs**. Supabase rejects
+   any redirect not on this list, so invites break without it. (Add
+   `http://localhost:3000/auth/callback` too if you also test locally.)
+6. **Provision the first admin.** The seeded `admin@dse.dev` `User` row already has
    `role=admin`; invite that email (Supabase dashboard → Add user → send invite, or
    `admin.createUser`). On first login it links to the existing row by email.
-5. **Admins create lecturers** in-app: Lecturers page → **Create login account** →
+7. **Admins create lecturers** in-app: Lecturers page → **Create login account** →
    name + email → Supabase sends the invite; the lecturer sets a password at
    `/auth/callback` and can sign in. `gen-token` is dev-mode only from here on.
+
+> **Common gotchas.** ① `authId` migration not run on prod → 500s on every request.
+> ② `SUPABASE_INVITE_REDIRECT_URL` or the allow-list still on `localhost` → invited
+> users can't set a password. ③ Frontend `NEXT_PUBLIC_*` vars missing → login page
+> can't reach Supabase. ④ Never commit the `service_role` key; rotate it if it ever
+> leaks (chat, logs, screenshots).
 
 ---
 
