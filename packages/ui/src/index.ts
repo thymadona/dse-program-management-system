@@ -54,6 +54,23 @@ export {
   TooltipContent,
   TooltipProvider,
 } from "./components/ui/tooltip.tsx";
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./components/ui/tabs.tsx";
+export {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  BreadcrumbEllipsis,
+} from "./components/ui/breadcrumb.tsx";
+export {
+  Progress,
+  ProgressTrack,
+  ProgressIndicator,
+  ProgressLabel,
+  ProgressValue,
+} from "./components/ui/progress.tsx";
 export {
   Sidebar,
   SidebarContent,
@@ -83,6 +100,7 @@ export {
 
 // Composed components
 export { StatusBadge, type StatusTone, type StatusBadgeProps } from "./components/status-badge.tsx";
+export { CompletionRing, type CompletionRingProps } from "./components/completion-ring.tsx";
 export { TableToolbar, type TableToolbarProps } from "./components/table-toolbar.tsx";
 export {
   DataTable,
