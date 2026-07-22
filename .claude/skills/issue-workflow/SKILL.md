@@ -14,6 +14,20 @@ The loop has four stages. Don't skip stages, but use judgment on *scope* — a t
 typo fix the user dictated directly doesn't need this ceremony; a feature, bug, or
 anything the user describes as a task to pick up does.
 
+Every issue also carries a Status on the **DSE PMS Roadmap** board (Todo / In
+Progress / Done) that should track which stage it's actually in — set explicitly
+at each transition below rather than assumed. Reference IDs (stable — same project
+every time):
+
+| | value |
+|---|---|
+| Project number | `4` (owner `thymadona`) |
+| Project ID | `PVT_kwHOBODUqM4BeBd4` |
+| Status field ID | `PVTSSF_lAHOBODUqM4BeBd4zhYetxE` |
+| Todo option ID | `f75ad846` |
+| In Progress option ID | `47fc9ee4` |
+| Done option ID | `98236657` |
+
 ## 1. Find or open the issue
 
 Before creating anything, check whether an issue for this work already exists:
@@ -35,18 +49,26 @@ Match the title style already in use (`docs: README is missing a Testing section
 `Add Total SLT when create a new course`) — imperative or `type:` prefix, not a
 restatement of the user's chat message.
 
-Every new issue also goes on the **DSE PMS Roadmap** project board (project #4,
-owner `thymadona`) — `gh issue create` doesn't do this itself, so add it as a
-separate step right after creating (or reusing) the issue:
+Every new issue also goes on the roadmap board — `gh issue create` doesn't do this
+itself, so add it as a separate step right after creating (or reusing) the issue.
+Use `--format json` so the item ID comes back directly instead of needing a second
+lookup:
 
 ```bash
-gh project item-add 4 --owner thymadona --url <issue-url>
+gh project item-add 4 --owner thymadona --url <issue-url> --format json
 ```
 
-`gh issue create` prints the issue URL on success — pass that straight through.
 If you're attaching to an issue found in step 1 rather than a newly created one,
 check first whether it's already on the board (`gh project item-list 4 --owner
-thymadona`) before adding it again.
+thymadona`) — adding a duplicate is harmless but noisy.
+
+New items don't reliably land on Todo by default (observed behavior on this board
+is inconsistent), so set it explicitly using the item ID the add command returned:
+
+```bash
+gh project item-edit --id <item-id> --project-id PVT_kwHOBODUqM4BeBd4 \
+  --field-id PVTSSF_lAHOBODUqM4BeBd4zhYetxE --single-select-option-id f75ad846
+```
 
 ## 2. Branch
 
@@ -56,6 +78,15 @@ traceability value (`example/readme-testing-section-7`); it's not required.
 
 ```bash
 git checkout -b <type>/<slug>
+```
+
+Move the board item to In Progress as soon as the branch exists and work has
+actually started (not at the moment the issue was filed) — reuse the item ID from
+step 1:
+
+```bash
+gh project item-edit --id <item-id> --project-id PVT_kwHOBODUqM4BeBd4 \
+  --field-id PVTSSF_lAHOBODUqM4BeBd4zhYetxE --single-select-option-id 47fc9ee4
 ```
 
 For work substantial enough to warrant an upfront design pass, note the plan in the
@@ -88,13 +119,16 @@ EOF
 ```
 
 `Closes #<N>` must be in the PR body (or title) exactly like PRs #3, #8, and #11 in
-this repo's history — that's what makes the issue close automatically on merge, so
-nothing manual is needed afterward. If the PR doesn't fully resolve the issue (partial
-work, follow-up needed), say so instead of using a closing keyword, and leave the issue
-open with a comment (`gh issue comment <N> --body "..."`) explaining what's left.
+this repo's history — that's what makes the issue close automatically on merge. The
+board's "Item closed" workflow (already enabled on this project) then moves the Status
+to Done by itself — don't set Done manually, and don't wait around to confirm it fired.
+If the PR doesn't fully resolve the issue (partial work, follow-up needed), say so
+instead of using a closing keyword, and leave the issue open with a comment
+(`gh issue comment <N> --body "..."`) explaining what's left — Status stays In Progress.
 
 If the user asks to close an issue without a PR (abandoned work, duplicate, decided
-against it), close it explicitly and say why:
+against it), close it explicitly and say why — this also trips the "Item closed"
+board automation, so Status still lands on Done with no extra step:
 
 ```bash
 gh issue close <N> --comment "<reason>"
