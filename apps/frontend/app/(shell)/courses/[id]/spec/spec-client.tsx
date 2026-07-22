@@ -35,6 +35,13 @@ import {
   type CloMappingForm,
 } from "./clo-mapping-section";
 import { ProgrammeSection } from "./programme-section";
+import {
+  SltSectionForm,
+  EMPTY_SLT,
+  toSltForm,
+  toSltPayload,
+  type SltForm,
+} from "./slt-section";
 
 export function SpecClient({ courseId }: { courseId: string }) {
   const [activeId, setActiveId] = useState<SpecSectionId>("courseInfo");
@@ -42,6 +49,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
   const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
+  const [slt, setSlt] = useState<SltForm>(EMPTY_SLT);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,6 +68,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setCourseInfo(toCourseInfoForm(spec.data.courseInfo as Record<string, unknown> | undefined));
       setClos(toClosForm(spec.data.clos));
       setCloMapping(toCloMappingForm(spec.data.cloMapping));
+      setSlt(toSltForm(spec.data.slt));
       setStatus(spec.status ?? {});
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
@@ -105,6 +114,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
         const reconciled = reconcileMapping(clos, cloMapping);
         setCloMapping(reconciled);
         await courseSpecApi.saveSection(courseId, "cloMapping", toCloMappingPayload(reconciled));
+      } else if (activeId === "slt") {
+        await courseSpecApi.saveSection(courseId, "slt", toSltPayload(slt));
       }
       setStatus((s) => ({ ...s, [activeId]: "complete" }));
       setSavedFlash(true);
@@ -203,6 +214,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
               assessmentMethods={assessmentMethods}
               onAddMethod={handleAddMethod}
             />
+          ) : activeId === "slt" ? (
+            <SltSectionForm value={slt} onChange={setSlt} clos={clos} />
           ) : (
             <ComingSoon title={activeMeta?.title ?? ""} refLabel={activeMeta?.ref ?? ""} />
           )}

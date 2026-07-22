@@ -37,7 +37,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
   { id: "courseInfo", title: "Course Information", ref: "§1–13", part: "Part 2", state: "ready" },
   { id: "clos", title: "Course Learning Outcomes", ref: "§14", part: "Part 2", state: "ready" },
   { id: "cloMapping", title: "CLO → PLO Mapping & Methods", ref: "§15", part: "Part 2", state: "ready" },
-  { id: "slt", title: "Student Learning Time", ref: "§16", part: "Part 2", state: "soon" },
+  { id: "slt", title: "Student Learning Time", ref: "§16", part: "Part 2", state: "ready" },
   { id: "assessmentPlan", title: "Course Assessment Plan", ref: "§17", part: "Part 2", state: "soon" },
   { id: "lessonPlan", title: "Course Outline & Lesson Plan", ref: "§18", part: "Part 2", state: "soon" },
   { id: "resources", title: "Required Resources", ref: "§19", part: "Part 2", state: "soon" },
