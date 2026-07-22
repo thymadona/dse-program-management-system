@@ -1,5 +1,6 @@
 export * from "./plugins.ts";
 export * from "./contracts.ts";
+export * from "./auth.ts";
 export * from "./programme.ts";
 export * from "./students.ts";
 export * from "./lecturers.ts";

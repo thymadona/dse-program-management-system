@@ -6,6 +6,7 @@ import { lecturersPlugin } from "../plugins/lecturers/index.ts";
 import { coursesPlugin } from "../plugins/courses/index.ts";
 import { offeringsPlugin } from "../plugins/offerings/index.ts";
 import { methodsPlugin } from "../plugins/methods/index.ts";
+import { authPlugin } from "../plugins/auth/index.ts";
 
 /**
  * Builds the Express app: registers plugins, mounts each plugin router at
@@ -21,6 +22,7 @@ export function createApp(): Express {
   registry.register(coursesPlugin);
   registry.register(offeringsPlugin);
   registry.register(methodsPlugin);
+  registry.register(authPlugin);
 
   const app = express();
 

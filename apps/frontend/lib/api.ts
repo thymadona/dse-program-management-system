@@ -1,10 +1,22 @@
 /**
- * Thin fetch wrapper around the backend API. Attaches the temporary dev bearer
- * token (NEXT_PUBLIC_DEV_TOKEN) minted by `bun run gen-token`. When real login
- * (Supabase) lands, only this token source changes.
+ * Thin fetch wrapper around the backend API. This is the single place the bearer
+ * token is attached. In `AUTH_MODE=supabase` the token is the live Supabase
+ * session access token; in `dev` it falls back to the static NEXT_PUBLIC_DEV_TOKEN
+ * minted by `bun run gen-token`.
  */
+import { AUTH_MODE, getSupabase } from "./supabase";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const DEV_TOKEN = process.env.NEXT_PUBLIC_DEV_TOKEN ?? "";
+
+async function authHeader(): Promise<Record<string, string>> {
+  if (AUTH_MODE === "supabase") {
+    const { data } = await getSupabase().auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+  return DEV_TOKEN ? { Authorization: `Bearer ${DEV_TOKEN}` } : {};
+}
 
 export class ApiError extends Error {
   constructor(
@@ -21,7 +33,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: {
       "Content-Type": "application/json",
-      ...(DEV_TOKEN ? { Authorization: `Bearer ${DEV_TOKEN}` } : {}),
+      ...(await authHeader()),
       ...init?.headers,
     },
     cache: "no-store",

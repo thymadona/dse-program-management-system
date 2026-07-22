@@ -1,4 +1,5 @@
 import { StatusBadge } from "@dse-pms/ui";
+import { TopbarUser } from "./topbar-user";
 
 export interface TopbarProps {
   title: string;
@@ -20,6 +21,7 @@ export function Topbar({ title, subtitle }: TopbarProps) {
         {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
       </div>
       <div className="flex items-center gap-4 text-sm text-muted-foreground">
+        <TopbarUser />
         <span>{date}</span>
         <StatusBadge tone="live" label="Live" />
       </div>

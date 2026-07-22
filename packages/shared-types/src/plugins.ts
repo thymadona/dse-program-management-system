@@ -91,12 +91,22 @@ export const methodsManifest: PluginManifest = {
   permissions: ["methods:read", "methods:write"],
 };
 
+export const authManifest: PluginManifest = {
+  id: "auth",
+  name: "Auth",
+  version: "0.1.0",
+  description: "Identity (GET /me) and admin-only account provisioning via Supabase.",
+  // No routes: not a sidebar entry — account creation is embedded in the Lecturers page.
+  permissions: ["accounts:create"],
+};
+
 export const pluginManifests: PluginManifest[] = [
   studentsManifest,
   coursesManifest,
   offeringsManifest,
   lecturersManifest,
   methodsManifest,
+  authManifest,
 ];
 
 /** Sidebar nav is generated automatically from plugin routes. */
