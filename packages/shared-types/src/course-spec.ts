@@ -193,15 +193,25 @@ export type CourseInfoSection = z.infer<typeof CourseInfoSection>;
 
 /* --------------------------------------- §14 Course Learning Outcomes */
 
+/** Whether a CLO counts toward mapping and reports. */
+export const CLO_STATUSES = ["active", "inactive"] as const;
+export const CloStatus = z.enum(CLO_STATUSES);
+export type CloStatus = z.infer<typeof CloStatus>;
+
 /**
  * One Course Learning Outcome (§14). `code` (CLO1, CLO2…) is assigned by position.
- * Each CLO targets a single primary PLO and sits at one C/A/P Bloom level.
+ * A CLO sits at one C/A/P Bloom level and contributes to one or more PLOs; the
+ * assessment methods that measure it reference the shared `methods` vocabulary.
+ * `mappedPlos`/`assessmentMethodIds` are the source of truth the §15 mapping reads.
  */
 export const CloItem = z.object({
   code: z.string().min(1),
   description: z.string().min(1, "Describe what students will be able to do"),
-  ploId: PloId.nullable().optional(),
   level: CapLevel.nullable().optional(),
+  mappedPlos: z.array(PloId).default([]),
+  assessmentMethodIds: z.array(z.string()).default([]),
+  status: CloStatus.default("active"),
+  notes: z.string().default(""),
 });
 export type CloItem = z.infer<typeof CloItem>;
 

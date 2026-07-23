@@ -1,189 +1,309 @@
 "use client";
 
-import {
-  AFFECTIVE_LEVELS,
-  COGNITIVE_LEVELS,
-  PLOS,
-  PSYCHOMOTOR_LEVELS,
-} from "@dse-pms/shared-types";
+import { useMemo, useState } from "react";
+import { Copy, Eye, ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import type { Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
-import { ReferenceGuide } from "./reference-guide";
+import { bloomStyle, emptyClo, withCodes, type CloForm } from "./clo-model";
+import { ClosDashboard } from "./clo-dashboard";
+import { CloEditorDialog } from "./clo-editor-dialog";
 
-/** A CLO row held as strings for input binding; converted on save by the wizard. */
-export type CloForm = {
-  code: string;
-  description: string;
-  ploId: string;
-  level: string;
-};
+// Re-exported so the wizard can keep importing the CLO model from this section.
+export { EMPTY_CLOS, toClosForm, toClosPayload, type CloForm } from "./clo-model";
 
-export const EMPTY_CLOS: CloForm[] = [];
+type FilterKey = "all" | "active" | "inactive" | "mapped" | "unmapped";
 
-/** Assign CLO codes by position so they stay sequential after add/remove. */
-function withCodes(items: CloForm[]): CloForm[] {
-  return items.map((item, i) => ({ ...item, code: `CLO${i + 1}` }));
-}
-
-/** Map the API's §14 payload into the string-based form model. */
-export function toClosForm(data: unknown): CloForm[] {
-  const items = (data as { items?: unknown[] } | undefined)?.items ?? [];
-  const str = (v: unknown) => (v == null ? "" : String(v));
-  return withCodes(
-    items.map((raw) => {
-      const d = (raw ?? {}) as Record<string, unknown>;
-      return {
-        code: str(d.code),
-        description: str(d.description),
-        ploId: str(d.ploId),
-        level: str(d.level),
-      };
-    }),
-  );
-}
-
-/** Convert the form model into the ClosSection payload the API validates. */
-export function toClosPayload(items: CloForm[]) {
-  return {
-    items: withCodes(items).map((f) => ({
-      code: f.code,
-      description: f.description.trim(),
-      ploId: f.ploId || null,
-      level: f.level || null,
-    })),
-  };
-}
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "all", label: "All CLOs" },
+  { key: "active", label: "Active" },
+  { key: "inactive", label: "Inactive" },
+  { key: "mapped", label: "Mapped to PLOs" },
+  { key: "unmapped", label: "Not mapped" },
+];
 
 export function ClosSection({
   value,
-  onChange,
+  assessmentMethods,
+  saving,
+  lastSavedAt,
+  onPersist,
 }: {
   value: CloForm[];
-  onChange: (items: CloForm[]) => void;
+  assessmentMethods: Method[];
+  saving: boolean;
+  lastSavedAt: Date | null;
+  /** Persist the given CLO list (whole §14 section) and sync wizard state. */
+  onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
-  const items = withCodes(value);
+  const clos = withCodes(value);
+  const methodName = useMemo(() => {
+    const map = new Map(assessmentMethods.map((m) => [m.id, m.name]));
+    return (id: string) => map.get(id) ?? id;
+  }, [assessmentMethods]);
 
-  const update = (index: number, patch: Partial<CloForm>) => {
-    onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [notice, setNotice] = useState<string | null>(null);
+  // Dialog state: editing an existing index, adding (null index + open), or closed.
+  const [editing, setEditing] = useState<{ index: number | null } | null>(null);
+
+  const visible = clos.filter((c) => {
+    if (filter === "active" && c.status !== "active") return false;
+    if (filter === "inactive" && c.status !== "inactive") return false;
+    if (filter === "mapped" && c.mappedPlos.length === 0) return false;
+    if (filter === "unmapped" && c.mappedPlos.length > 0) return false;
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      const hay = `${c.code} ${c.description} ${c.mappedPlos.join(" ")}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const openAdd = () => setEditing({ index: null });
+  const openEdit = (index: number) => setEditing({ index });
+
+  const handleSave = async (draft: CloForm) => {
+    const next =
+      editing?.index == null
+        ? [...clos, draft]
+        : clos.map((c, i) => (i === editing.index ? draft : c));
+    const ok = await onPersist(withCodes(next));
+    if (ok) setEditing(null);
   };
-  const add = () => onChange([...items, { code: "", description: "", ploId: "", level: "" }]);
-  const remove = (index: number) => onChange(items.filter((_, i) => i !== index));
+
+  const duplicate = (index: number) => {
+    const src = clos[index];
+    if (!src) return;
+    const next = [...clos.slice(0, index + 1), { ...src, code: "" }, ...clos.slice(index + 1)];
+    onPersist(withCodes(next));
+  };
+
+  const remove = (index: number) => {
+    const src = clos[index];
+    if (typeof window !== "undefined" && !window.confirm(`Delete ${src?.code}? This can't be undone.`)) {
+      return;
+    }
+    onPersist(withCodes(clos.filter((_, i) => i !== index)));
+  };
+
+  const editingClo = editing?.index != null ? clos[editing.index] ?? null : null;
 
   return (
-    <div className="space-y-5">
-      <p className="text-sm text-muted-foreground">
-        List what students will be able to do by the end of the course. Each CLO targets one
-        programme learning outcome (PLO) and sits at one Bloom level in the Cognitive (C), Affective
-        (A), or Psychomotor (P) domain.
-      </p>
-
-      <div className="grid gap-3 sm:grid-cols-3">
-        <ReferenceGuide title="Cognitive (C1–C6)" rows={[...COGNITIVE_LEVELS]} />
-        <ReferenceGuide title="Affective (A1–A5)" rows={[...AFFECTIVE_LEVELS]} />
-        <ReferenceGuide title="Psychomotor (P1–P7)" rows={[...PSYCHOMOTOR_LEVELS]} />
+    <div className="space-y-4">
+      {/* Section header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">Course Learning Outcomes (CLOs)</h2>
+          <p className="text-sm text-muted-foreground">
+            Define and manage the Course Learning Outcomes for this course.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {lastSavedAt ? (
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              Last saved: {formatSaved(lastSavedAt)}
+            </span>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setNotice("Preview & PDF export are coming in a later phase.")}
+          >
+            <Eye className="mr-1.5 h-4 w-4" /> Preview CLOs
+          </Button>
+          <Button size="sm" onClick={openAdd}>
+            <Plus className="mr-1.5 h-4 w-4" /> Add CLO
+          </Button>
+        </div>
       </div>
 
-      <div className="space-y-4">
-        {items.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-border py-8 text-center text-sm text-muted-foreground">
-            No learning outcomes yet. Add the first one to get started.
+      {notice ? (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          {notice}
+          <button type="button" onClick={() => setNotice(null)} className="text-xs font-medium hover:text-foreground">
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
+      <ClosDashboard clos={clos} />
+
+      {/* Table */}
+      <section className="rounded-xl border border-border bg-card p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-sm font-semibold text-foreground">Course Learning Outcomes (CLOs)</h3>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search CLOs…"
+                className="h-9 w-44 rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              />
+            </div>
+            <div className="relative">
+              <ListFilter className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <select
+                value={filter}
+                onChange={(e) => setFilter(e.target.value as FilterKey)}
+                className="h-9 rounded-lg border border-border bg-card pl-8 pr-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                {FILTERS.map((f) => (
+                  <option key={f.key} value={f.key}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {clos.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border py-12 text-center">
+            <p className="text-sm text-muted-foreground">No learning outcomes yet.</p>
+            <button
+              type="button"
+              onClick={openAdd}
+              className="mt-1 text-sm font-medium text-accent-foreground hover:underline"
+            >
+              + Add your first CLO
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
+                  <th className="w-8 py-2 pr-2">#</th>
+                  <th className="py-2 pr-3">CLO Code</th>
+                  <th className="py-2 pr-3">Course Learning Outcome</th>
+                  <th className="py-2 pr-3">Bloom's Level</th>
+                  <th className="py-2 pr-3">Mapped PLOs</th>
+                  <th className="py-2 pr-3">Assessment Methods</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                      No CLOs match your search.
+                    </td>
+                  </tr>
+                ) : (
+                  visible.map((clo) => {
+                    const index = clos.indexOf(clo);
+                    const bloom = clo.level ? bloomStyle(clo.level) : null;
+                    return (
+                      <tr key={clo.code} className="border-b border-border/70 align-top">
+                        <td className="py-3 pr-2 text-muted-foreground">{index + 1}</td>
+                        <td className="py-3 pr-3 font-semibold text-accent-foreground">{clo.code}</td>
+                        <td className="max-w-[320px] py-3 pr-3 text-foreground">
+                          {clo.description || <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="py-3 pr-3">
+                          {bloom ? (
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${bloom.chip}`}>
+                              {bloom.name}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 pr-3 text-foreground">
+                          {clo.mappedPlos.length ? clo.mappedPlos.join(", ") : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="max-w-[220px] py-3 pr-3 text-muted-foreground">
+                          {clo.assessmentMethodIds.length
+                            ? clo.assessmentMethodIds.map(methodName).join(", ")
+                            : "—"}
+                        </td>
+                        <td className="py-3 pr-3">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: clo.status === "active" ? "#22c55e" : "var(--muted-foreground)" }}
+                            />
+                            <span className="text-foreground">{clo.status === "active" ? "Active" : "Inactive"}</span>
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <IconButton label={`Edit ${clo.code}`} onClick={() => openEdit(index)}>
+                              <Pencil className="h-4 w-4" />
+                            </IconButton>
+                            <IconButton label={`Duplicate ${clo.code}`} onClick={() => duplicate(index)}>
+                              <Copy className="h-4 w-4" />
+                            </IconButton>
+                            <IconButton label={`Delete ${clo.code}`} danger onClick={() => remove(index)}>
+                              <Trash2 className="h-4 w-4" />
+                            </IconButton>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {clos.length > 0 ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Showing {visible.length} of {clos.length} CLO{clos.length === 1 ? "" : "s"}
           </p>
         ) : null}
+      </section>
 
-        {items.map((item, i) => (
-          <fieldset key={i} className="space-y-3 rounded-lg border border-border p-4">
-            <legend className="flex items-center gap-2 px-1">
-              <span className="text-sm font-semibold text-foreground">{item.code}</span>
-            </legend>
-
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-foreground">Description</span>
-              <textarea
-                className="min-h-[72px] w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                placeholder="Students will be able to…"
-                value={item.description}
-                onChange={(e) => update(i, { description: e.target.value })}
-              />
-            </label>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-foreground">Primary PLO</span>
-                <LevelSelect value={item.ploId} onChange={(v) => update(i, { ploId: v })}>
-                  <option value="">— Select PLO —</option>
-                  {PLOS.map((plo) => (
-                    <option key={plo.id} value={plo.id} title={plo.description}>
-                      {plo.id} — {plo.description.slice(0, 48)}
-                      {plo.description.length > 48 ? "…" : ""}
-                    </option>
-                  ))}
-                </LevelSelect>
-              </label>
-
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-foreground">C/A/P Level</span>
-                <LevelSelect value={item.level} onChange={(v) => update(i, { level: v })}>
-                  <option value="">— Select level —</option>
-                  <optgroup label="Cognitive">
-                    {COGNITIVE_LEVELS.map((l) => (
-                      <option key={l.code} value={l.code}>
-                        {l.code} — {l.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Affective">
-                    {AFFECTIVE_LEVELS.map((l) => (
-                      <option key={l.code} value={l.code}>
-                        {l.code} — {l.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Psychomotor">
-                    {PSYCHOMOTOR_LEVELS.map((l) => (
-                      <option key={l.code} value={l.code}>
-                        {l.code} — {l.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                </LevelSelect>
-              </label>
-            </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="text-xs text-muted-foreground hover:text-status-live"
-              >
-                Remove {item.code}
-              </button>
-            </div>
-          </fieldset>
-        ))}
-      </div>
-
-      <Button variant="outline" onClick={add}>
-        + Add learning outcome
-      </Button>
+      <CloEditorDialog
+        open={editing != null}
+        clo={editingClo}
+        index={editing?.index != null ? editing.index + 1 : null}
+        assessmentMethods={assessmentMethods}
+        saving={saving}
+        onCancel={() => setEditing(null)}
+        onSave={handleSave}
+      />
     </div>
   );
 }
 
-function LevelSelect({
-  value,
-  onChange,
+function IconButton({
+  label,
+  danger,
+  onClick,
   children,
 }: {
-  value: string;
-  onChange: (v: string) => void;
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <select
-      className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-colors hover:bg-muted ${
+        danger ? "text-status-live hover:border-status-live/40" : "text-muted-foreground hover:text-foreground"
+      }`}
     >
       {children}
-    </select>
+    </button>
   );
+}
+
+function formatSaved(d: Date): string {
+  return d.toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

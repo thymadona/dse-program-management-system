@@ -8,9 +8,26 @@ import {
   type SpecSectionId,
   type SpecSectionStatus,
 } from "@dse-pms/shared-types";
-import { Button } from "@dse-pms/ui";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@dse-pms/ui";
 import { ApiError } from "@/lib/api";
-import { coursesApi } from "@/lib/courses";
+import { coursesApi, type CourseView } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
 import { methodsApi } from "@/lib/methods";
 import {
@@ -34,7 +51,6 @@ import {
   toCloMappingPayload,
   type CloMappingForm,
 } from "./clo-mapping-section";
-import { ProgrammeSection } from "./programme-section";
 import {
   SltSectionForm,
   EMPTY_SLT,
@@ -42,14 +58,33 @@ import {
   toSltPayload,
   type SltForm,
 } from "./slt-section";
+import { OverviewTab } from "./overview-tab";
+
+/** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
+type TabId = "overview" | "documentPreview" | SpecSectionId;
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "clos", label: "CLOs" },
+  { id: "slt", label: "Weekly Plan" },
+  { id: "assessmentPlan", label: "Assessment" },
+  { id: "resources", label: "Resources" },
+  { id: "policy", label: "Policies" },
+  { id: "cloMapping", label: "Mapping" },
+  { id: "documentPreview", label: "Document Preview" },
+];
+
+const sectionMeta = (id: TabId) => SPEC_SECTIONS.find((s) => s.id === id);
 
 export function SpecClient({ courseId }: { courseId: string }) {
-  const [activeId, setActiveId] = useState<SpecSectionId>("courseInfo");
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [course, setCourse] = useState<CourseView | null>(null);
   const [status, setStatus] = useState<Record<string, SpecSectionStatus>>({});
   const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
   const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
   const [slt, setSlt] = useState<SltForm>(EMPTY_SLT);
+  const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
@@ -57,12 +92,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [courseInfoDialogOpen, setCourseInfoDialogOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [spec, methods, course] = await Promise.all([
+      const [spec, methods, courseView] = await Promise.all([
         courseSpecApi.get(courseId),
         methodsApi.list(),
         coursesApi.get(courseId),
@@ -74,7 +110,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setStatus(spec.status ?? {});
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
-      setCourseTotalSlt(course.totalSltHours ?? null);
+      setCourse(courseView);
+      setCourseTotalSlt(courseView.totalSltHours ?? null);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load the course specification");
     } finally {
@@ -86,174 +123,239 @@ export function SpecClient({ courseId }: { courseId: string }) {
     load();
   }, [load]);
 
-  const activeIndex = useMemo(
-    () => SPEC_SECTIONS.findIndex((s) => s.id === activeId),
-    [activeId],
-  );
-  const activeMeta = SPEC_SECTIONS[activeIndex];
-  const prev = SPEC_SECTIONS[activeIndex - 1];
-  const next = SPEC_SECTIONS[activeIndex + 1];
-  const canSave = activeMeta?.state === "ready" && activeId !== "programme";
-
-  const handleSave = async () => {
-    if (!canSave) return;
-    setSaving(true);
-    setError(null);
-    try {
-      if (activeId === "courseInfo") {
-        await courseSpecApi.saveSection(courseId, "courseInfo", toCourseInfoPayload(courseInfo));
-      } else if (activeId === "clos") {
-        await courseSpecApi.saveSection(courseId, "clos", toClosPayload(clos));
-      } else if (activeId === "cloMapping") {
-        const reconciled = reconcileMapping(clos, cloMapping);
-        setCloMapping(reconciled);
-        await courseSpecApi.saveSection(
-          courseId,
-          "cloMapping",
-          toCloMappingPayload(reconciled, courseTotalSlt),
-        );
-      } else if (activeId === "slt") {
-        await courseSpecApi.saveSection(courseId, "slt", toSltPayload(slt));
+  // §14 saves per action (add / edit / duplicate / delete), so it persists an
+  // explicit list rather than reading possibly-stale `clos` state from a closure.
+  const persistClos = useCallback(
+    async (items: CloForm[]) => {
+      setClos(items);
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(courseId, "clos", toClosPayload(items));
+        setStatus((s) => ({ ...s, clos: "complete" }));
+        setClosSavedAt(new Date());
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to save this section");
+        return false;
+      } finally {
+        setSaving(false);
       }
-      setStatus((s) => ({ ...s, [activeId]: "complete" }));
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 2000);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to save this section");
-    } finally {
-      setSaving(false);
-    }
-  };
+    },
+    [courseId],
+  );
 
-  const title = courseInfo.courseCode
-    ? `${courseInfo.courseCode} — Course Specification`
-    : "Course Specification";
+  const saveSection = useCallback(
+    async (sectionId: "courseInfo" | "cloMapping" | "slt") => {
+      setSaving(true);
+      setError(null);
+      try {
+        if (sectionId === "courseInfo") {
+          await courseSpecApi.saveSection(courseId, "courseInfo", toCourseInfoPayload(courseInfo));
+        } else if (sectionId === "cloMapping") {
+          const reconciled = reconcileMapping(clos, cloMapping);
+          setCloMapping(reconciled);
+          await courseSpecApi.saveSection(
+            courseId,
+            "cloMapping",
+            toCloMappingPayload(reconciled, courseTotalSlt),
+          );
+        } else if (sectionId === "slt") {
+          await courseSpecApi.saveSection(courseId, "slt", toSltPayload(slt));
+        }
+        setStatus((s) => ({ ...s, [sectionId]: "complete" }));
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 2000);
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to save this section");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, courseInfo, clos, cloMapping, slt, courseTotalSlt],
+  );
+
+  const activeMeta = useMemo(() => sectionMeta(activeTab), [activeTab]);
+  const canSaveActive = activeTab === "cloMapping" || activeTab === "slt";
+
+  const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
 
   return (
-    <div className="mx-auto flex max-w-6xl gap-6">
-      {/* Stepper */}
-      <nav className="hidden w-64 shrink-0 lg:block">
-        <Link href="/courses" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Back to Courses
-        </Link>
-        <ol className="mt-4 space-y-1">
-          {SPEC_SECTIONS.map((s, i) => {
-            const isActive = s.id === activeId;
-            const done = status[s.id] === "complete";
-            return (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  onClick={() => setActiveId(s.id)}
-                  className={`flex w-full items-start gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                    isActive
-                      ? "bg-accent/15 font-medium text-foreground"
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  <span
-                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] ${
-                      done
-                        ? "bg-emerald-500 text-white"
-                        : isActive
-                          ? "bg-accent text-white"
-                          : "border border-border text-muted-foreground"
-                    }`}
-                  >
-                    {done ? "✓" : i}
-                  </span>
-                  <span className="flex flex-col">
-                    <span>{s.title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {s.ref}
-                      {s.state === "soon" ? " · soon" : ""}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
+    <div className="mx-auto max-w-7xl space-y-4">
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink render={<Link href="/courses">Course Management</Link>} />
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{breadcrumbLabel}</BreadcrumbPage>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Course Specification</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
-      {/* Main panel */}
-      <div className="min-w-0 flex-1">
-        <header className="mb-4">
-          <h1 className="text-lg font-semibold text-foreground">{title}</h1>
-          <p className="text-sm text-muted-foreground">
-            {activeMeta?.title} <span className="text-muted-foreground">· {activeMeta?.ref}</span>
-          </p>
-        </header>
+      <header>
+        <h1 className="text-2xl font-bold text-foreground">Course Specification</h1>
+        <p className="text-sm text-muted-foreground">Design and manage your course in OBE format.</p>
+      </header>
 
-        {error ? (
-          <div className="mb-4 rounded-lg border border-status-live/40 bg-status-live/10 px-3 py-2 text-sm text-status-live">
-            {error}
-          </div>
-        ) : null}
+      {error ? (
+        <div className="rounded-lg border border-status-live/40 bg-status-live/10 px-3 py-2 text-sm text-status-live">
+          {error}
+        </div>
+      ) : null}
 
-        <section className="rounded-xl border border-border bg-card p-6">
-          {loading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : activeId === "programme" ? (
-            <ProgrammeSection />
-          ) : activeId === "courseInfo" ? (
-            <CourseInfoSection
-              value={courseInfo}
-              onChange={(patch) => setCourseInfo((v) => ({ ...v, ...patch }))}
-            />
-          ) : activeId === "clos" ? (
-            <ClosSection value={clos} onChange={setClos} />
-          ) : activeId === "cloMapping" ? (
-            <CloMappingSection
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : (
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as TabId)}
+        >
+          <TabsList variant="line" className="w-full justify-start overflow-x-auto">
+            {TABS.map((t) => (
+              <TabsTrigger key={t.id} value={t.id}>
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <TabsContent value="overview" className="mt-4">
+            <OverviewTab
+              courseInfo={courseInfo}
               clos={clos}
-              value={cloMapping}
-              onChange={setCloMapping}
-              teachingMethods={teachingMethods}
-              assessmentMethods={assessmentMethods}
-              courseTotalSlt={courseTotalSlt}
+              cloMapping={cloMapping}
+              slt={slt}
+              status={status}
+              onEditCourseInfo={() => setCourseInfoDialogOpen(true)}
+              onGoToTab={(id) => setActiveTab(id)}
             />
-          ) : activeId === "slt" ? (
-            <SltSectionForm value={slt} onChange={setSlt} clos={clos} />
-          ) : (
-            <ComingSoon title={activeMeta?.title ?? ""} refLabel={activeMeta?.ref ?? ""} />
-          )}
-        </section>
+          </TabsContent>
 
-        {/* Footer nav */}
-        <footer className="mt-4 flex items-center justify-between">
-          <Button
-            variant="outline"
-            disabled={!prev}
-            onClick={() => prev && setActiveId(prev.id)}
-          >
-            ← Back
-          </Button>
-          <div className="flex items-center gap-3">
-            {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
-            {canSave ? (
-              <Button variant="outline" onClick={handleSave} disabled={saving}>
+          <TabsContent value="clos" className="mt-4">
+            <ClosSection
+              value={clos}
+              assessmentMethods={assessmentMethods}
+              saving={saving}
+              lastSavedAt={closSavedAt}
+              onPersist={persistClos}
+            />
+          </TabsContent>
+
+          <TabsContent value="slt" className="mt-4">
+            <SectionPanel>
+              <SltSectionForm value={slt} onChange={setSlt} clos={clos} />
+            </SectionPanel>
+          </TabsContent>
+
+          <TabsContent value="cloMapping" className="mt-4">
+            <SectionPanel>
+              <CloMappingSection
+                clos={clos}
+                value={cloMapping}
+                onChange={setCloMapping}
+                teachingMethods={teachingMethods}
+                assessmentMethods={assessmentMethods}
+                courseTotalSlt={courseTotalSlt}
+              />
+            </SectionPanel>
+          </TabsContent>
+
+          <TabsContent value="assessmentPlan" className="mt-4">
+            <SectionPanel>
+              <ComingSoon meta={activeMeta} />
+            </SectionPanel>
+          </TabsContent>
+
+          <TabsContent value="resources" className="mt-4">
+            <SectionPanel>
+              <ComingSoon meta={sectionMeta("resources")} />
+            </SectionPanel>
+          </TabsContent>
+
+          <TabsContent value="policy" className="mt-4">
+            <SectionPanel>
+              <ComingSoon meta={sectionMeta("policy")} />
+            </SectionPanel>
+          </TabsContent>
+
+          <TabsContent value="documentPreview" className="mt-4">
+            <SectionPanel>
+              <div className="py-10 text-center">
+                <p className="text-sm font-medium text-foreground">Document Preview</p>
+                <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                  Assembling Part 1 + Part 2 into the final syllabus document is coming in a later
+                  phase. Each section above is saved as you go, so nothing here is lost once this
+                  ships.
+                </p>
+              </div>
+            </SectionPanel>
+          </TabsContent>
+
+          {canSaveActive ? (
+            <div className="mt-4 flex items-center justify-end gap-3">
+              {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
+              <Button
+                variant="outline"
+                onClick={() => saveSection(activeTab as "cloMapping" | "slt")}
+                disabled={saving}
+              >
                 {saving ? "Saving…" : "Save"}
               </Button>
-            ) : null}
-            <Button disabled={!next} onClick={() => next && setActiveId(next.id)}>
-              Next →
+            </div>
+          ) : null}
+        </Tabs>
+      )}
+
+      <Dialog open={courseInfoDialogOpen} onOpenChange={setCourseInfoDialogOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Course Information</DialogTitle>
+          </DialogHeader>
+          <CourseInfoSection
+            value={courseInfo}
+            onChange={(patch) => setCourseInfo((v) => ({ ...v, ...patch }))}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCourseInfoDialogOpen(false)}>
+              Cancel
             </Button>
-          </div>
-        </footer>
-      </div>
+            <Button
+              onClick={async () => {
+                const ok = await saveSection("courseInfo");
+                if (ok) setCourseInfoDialogOpen(false);
+              }}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function ComingSoon({ title, refLabel }: { title: string; refLabel: string }) {
+function SectionPanel({ children }: { children: React.ReactNode }) {
+  return <section className="rounded-xl border border-border bg-card p-6">{children}</section>;
+}
+
+function ComingSoon({ meta }: { meta?: { title: string; ref?: string } }) {
   return (
     <div className="py-10 text-center">
       <p className="text-sm font-medium text-foreground">
-        {title} <span className="text-muted-foreground">({refLabel})</span>
+        {meta?.title} <span className="text-muted-foreground">({meta?.ref})</span>
       </p>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         This section is coming in a later phase. The full syllabus structure is shown here so you can
-        see the whole document — for now, fill in <strong>Course Information</strong>.
+        see the whole document — for now, fill in <strong>Course Information</strong>, CLOs, Weekly
+        Plan, and Mapping.
       </p>
     </div>
   );
