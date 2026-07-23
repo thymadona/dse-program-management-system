@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   AFFECTIVE_LEVELS,
   ASSESSMENT_FORMATS,
@@ -8,6 +9,7 @@ import {
   PLOS,
   PSYCHOMOTOR_LEVELS,
   SUBMISSION_METHODS,
+  type Rubric,
 } from "@dse-pms/shared-types";
 import { Switch } from "@dse-pms/ui";
 import type { CloForm } from "../clo-model";
@@ -23,15 +25,22 @@ export function AssessmentFormFields({
   set,
   toggle,
   clos,
+  rubrics,
+  courseId,
   touched,
 }: {
   draft: AssessmentForm;
   set: (patch: Partial<AssessmentForm>) => void;
   toggle: (key: "cloCodes" | "mappedPlos", id: string) => void;
   clos: CloForm[];
+  rubrics: Rubric[];
+  courseId: string;
   touched: boolean;
 }) {
   const nameError = touched && draft.name.trim().length === 0;
+  // A previously-saved rubric whose row has since been deleted: keep it selectable
+  // so editing an assessment doesn't silently drop the link.
+  const missingRubric = draft.rubric !== "" && !rubrics.some((r) => r.id === draft.rubric);
 
   return (
     <div className="space-y-8">
@@ -246,13 +255,45 @@ export function AssessmentFormFields({
           </Field>
 
           <Field label="Rubric">
-            <input
+            <select
               value={draft.rubric}
               onChange={(e) => set({ rubric: e.target.value })}
-              placeholder="e.g. Assignment Rubric – Written Report"
-              className={inputCls(false)}
-            />
-            <Hint>Name of the rubric used to grade this assessment.</Hint>
+              className={selectCls}
+            >
+              <option value="">— No rubric —</option>
+              {rubrics.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({r.type})
+                </option>
+              ))}
+              {missingRubric ? (
+                <option value={draft.rubric}>Selected rubric (no longer in library)</option>
+              ) : null}
+            </select>
+            <Hint>
+              Choose a rubric from the{" "}
+              <Link
+                href={`/courses/${courseId}/spec/assessment/rubrics`}
+                className="font-medium text-accent-foreground hover:underline"
+              >
+                Rubric Library
+              </Link>
+              {rubrics.length === 0 ? (
+                <>
+                  {" "}
+                  —{" "}
+                  <Link
+                    href={`/courses/${courseId}/spec/assessment/rubrics/new`}
+                    className="font-medium text-accent-foreground hover:underline"
+                  >
+                    create one
+                  </Link>{" "}
+                  first.
+                </>
+              ) : (
+                " used to grade this assessment."
+              )}
+            </Hint>
           </Field>
         </div>
       </Section>

@@ -61,6 +61,68 @@ const assessmentMethods = [
   "Project", "Presentation & Defence", "Peer Review", "Reflection Journal",
 ];
 
+// Standard 4-point rating scale shared by the sample rubrics.
+const scale4 = [
+  { label: "Excellent", points: 4 },
+  { label: "Good", points: 3 },
+  { label: "Fair", points: 2 },
+  { label: "Poor", points: 1 },
+];
+
+/** A few sample rubrics for the Rubric Library, owned by the seed lecturer. */
+const rubrics = [
+  {
+    name: "Assignment Rubric – Written Report",
+    type: "Assignment",
+    description: "Evaluates written assignments and reports based on content, analysis, organization and referencing.",
+    status: "Active" as const,
+    levels: scale4,
+    criteria: [
+      { id: "c1", name: "Content Quality", descriptors: ["Exceptional understanding and depth", "Good understanding with minor gaps", "Basic understanding with some gaps", "Limited understanding and depth"] },
+      { id: "c2", name: "Analysis & Critical Thinking", descriptors: ["Insightful analysis with strong evidence", "Good analysis with some evidence", "Limited analysis with weak evidence", "Minimal analysis with little evidence"] },
+      { id: "c3", name: "Organization & Structure", descriptors: ["Excellent flow and structure", "Well organized with minor issues", "Somewhat organized with issues", "Poorly organized and hard to follow"] },
+      { id: "c4", name: "Referencing", descriptors: ["Flawless, consistent citations", "Mostly correct citations", "Inconsistent citations", "Missing or incorrect citations"] },
+      { id: "c5", name: "Language & Clarity", descriptors: ["Clear, precise, error-free", "Clear with minor errors", "Understandable with several errors", "Unclear with frequent errors"] },
+    ],
+  },
+  {
+    name: "Presentation Rubric",
+    type: "Presentation",
+    description: "Evaluates student presentations on delivery, content and visual aids.",
+    status: "Active" as const,
+    levels: scale4,
+    criteria: [
+      { id: "c1", name: "Delivery & Confidence", descriptors: ["Engaging and confident throughout", "Mostly confident delivery", "Hesitant in places", "Difficult to follow"] },
+      { id: "c2", name: "Content Mastery", descriptors: ["Complete command of the topic", "Good command with minor gaps", "Partial command", "Weak grasp of the topic"] },
+      { id: "c3", name: "Visual Aids", descriptors: ["Clear, effective, well-designed", "Helpful and readable", "Cluttered or sparse", "Distracting or absent"] },
+      { id: "c4", name: "Time Management", descriptors: ["Perfectly paced", "Slightly over/under time", "Noticeably off time", "Far outside the limit"] },
+    ],
+  },
+  {
+    name: "Lab Report Rubric",
+    type: "Lab",
+    description: "Evaluates laboratory reports on method, results and interpretation.",
+    status: "Active" as const,
+    levels: scale4,
+    criteria: [
+      { id: "c1", name: "Methodology", descriptors: ["Rigorous and reproducible", "Sound with minor omissions", "Incomplete method", "Flawed or missing method"] },
+      { id: "c2", name: "Results & Data", descriptors: ["Accurate, well-presented data", "Mostly accurate data", "Some errors in data", "Inaccurate or missing data"] },
+      { id: "c3", name: "Interpretation", descriptors: ["Insightful, well-justified", "Reasonable conclusions", "Superficial interpretation", "Incorrect or absent"] },
+    ],
+  },
+  {
+    name: "Quiz Rubric",
+    type: "Quiz",
+    description: "Scores short quizzes and quiz items.",
+    status: "Draft" as const,
+    levels: scale4,
+    criteria: [
+      { id: "c1", name: "Accuracy", descriptors: ["All answers correct", "Most answers correct", "About half correct", "Few answers correct"] },
+      { id: "c2", name: "Reasoning Shown", descriptors: ["Clear working throughout", "Working mostly shown", "Little working shown", "No working shown"] },
+    ],
+  },
+];
+
 async function main() {
   for (const u of users) {
     await prisma.user.upsert({ where: { email: u.email }, update: u, create: u });
@@ -93,6 +155,20 @@ async function main() {
     });
   }
 
+  // Sample rubrics owned by the seed lecturer. Name isn't unique, so guard on
+  // (name, ownerId) to keep the seed idempotent.
+  const rubricOwner = await prisma.user.findUnique({ where: { email: "lecturer@dse.dev" } });
+  for (const r of rubrics) {
+    const existing = await prisma.rubric.findFirst({
+      where: { name: r.name, ownerId: rubricOwner?.id ?? null },
+    });
+    if (existing) {
+      await prisma.rubric.update({ where: { id: existing.id }, data: { ...r } });
+    } else {
+      await prisma.rubric.create({ data: { ...r, ownerId: rubricOwner?.id ?? null } });
+    }
+  }
+
   // One offering: CS101 in 2025-Fall, taught by its course lecturer, enrol 2 students.
   const cs101 = await prisma.course.findUnique({ where: { code: "CS101" } });
   if (cs101) {
@@ -122,7 +198,8 @@ async function main() {
   // eslint-disable-next-line no-console
   console.log(
     `Seeded ${users.length} users, ${students.length} students, ${courses.length} courses, ` +
-      `${teachingMethods.length} teaching + ${assessmentMethods.length} assessment methods, 1 offering.`,
+      `${teachingMethods.length} teaching + ${assessmentMethods.length} assessment methods, ` +
+      `${rubrics.length} rubrics, 1 offering.`,
   );
 }
 

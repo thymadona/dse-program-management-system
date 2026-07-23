@@ -12,10 +12,12 @@ import {
   BreadcrumbSeparator,
   Button,
 } from "@dse-pms/ui";
+import type { Rubric } from "@dse-pms/shared-types";
 import { Topbar } from "../../../../topbar";
 import { ApiError } from "@/lib/api";
 import { coursesApi, type CourseView } from "@/lib/courses";
 import { courseSpecApi } from "@/lib/course-spec";
+import { rubricsApi } from "@/lib/rubrics";
 import { toClosForm, type CloForm } from "../clo-model";
 import {
   emptyAssessment,
@@ -36,6 +38,7 @@ export function AssessmentFormPage({
   const [course, setCourse] = useState<CourseView | null>(null);
   const [items, setItems] = useState<AssessmentForm[]>([]);
   const [clos, setClos] = useState<CloForm[]>([]);
+  const [rubrics, setRubrics] = useState<Rubric[]>([]);
   const [draft, setDraft] = useState<AssessmentForm | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,15 +52,17 @@ export function AssessmentFormPage({
       setLoading(true);
       setError(null);
       try {
-        const [spec, courseView] = await Promise.all([
+        const [spec, courseView, rubricList] = await Promise.all([
           courseSpecApi.get(courseId),
           coursesApi.get(courseId),
+          rubricsApi.list().catch(() => [] as Rubric[]),
         ]);
         if (cancelled) return;
         const list = toAssessmentForm(spec.data.assessmentPlan);
         setItems(list);
         setClos(toClosForm(spec.data.clos));
         setCourse(courseView);
+        setRubrics(rubricList);
         if (assessmentId) {
           const existing = list.find((a) => a.id === assessmentId) ?? null;
           setDraft(existing);
@@ -158,7 +163,15 @@ export function AssessmentFormPage({
             </p>
           ) : draft ? (
             <div className="space-y-6 rounded-xl border border-border bg-card p-6">
-              <AssessmentFormFields draft={draft} set={set} toggle={toggle} clos={clos} touched={touched} />
+              <AssessmentFormFields
+                draft={draft}
+                set={set}
+                toggle={toggle}
+                clos={clos}
+                rubrics={rubrics}
+                courseId={courseId}
+                touched={touched}
+              />
 
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
                 <Button variant="outline" render={<Link href={backHref}>Cancel</Link>} />

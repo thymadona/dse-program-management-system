@@ -21,6 +21,8 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "lecturers:write",
     "methods:read",
     "methods:write",
+    "rubrics:read",
+    "rubrics:write",
   ],
   // Lecturers get exactly what their job needs: read the catalog, fill in the
   // specification of the courses/offerings they're assigned to, and grow the
@@ -38,8 +40,17 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "lecturers:read",
     "methods:read",
     "methods:write",
+    "rubrics:read",
+    "rubrics:write",
   ],
-  student: ["students:read", "courses:read", "offerings:read", "lecturers:read", "methods:read"],
+  student: [
+    "students:read",
+    "courses:read",
+    "offerings:read",
+    "lecturers:read",
+    "methods:read",
+    "rubrics:read",
+  ],
 };
 
 export function roleHasPermission(role: Role, permission: string): boolean {
