@@ -1,5 +1,13 @@
 import { expect, test } from "bun:test";
-import { CloMappingItem, WeeklyPlanSection, SPEC_SECTION_SCHEMAS, weekSlt, weeklyPlanTotals } from "./course-spec.ts";
+import {
+  AssessmentPlanSection,
+  assessmentPlanTotalWeight,
+  CloMappingItem,
+  WeeklyPlanSection,
+  SPEC_SECTION_SCHEMAS,
+  weekSlt,
+  weeklyPlanTotals,
+} from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
 test("CloMappingItem defaults method id arrays to []", () => {
@@ -75,4 +83,39 @@ test("weeklyPlanTotals sums contact, self-study, and derived SLT over all weeks"
 
 test("slt is registered in SPEC_SECTION_SCHEMAS as the weekly plan", () => {
   expect(SPEC_SECTION_SCHEMAS.slt).toBe(WeeklyPlanSection);
+});
+
+test("AssessmentPlanSection defaults items to []", () => {
+  expect(AssessmentPlanSection.parse({}).items).toEqual([]);
+});
+
+test("AssessmentItem coerces weight, defaults arrays/optionals, and requires a name", () => {
+  const parsed = AssessmentPlanSection.parse({
+    items: [{ id: "a1", name: "Assignment 1", type: "Assignment", weight: "10", cloCodes: ["CLO1"] }],
+  });
+  const a = parsed.items[0]!;
+  expect(a.weight).toBe(10);
+  expect(a.mode).toBe("individual");
+  expect(a.status).toBe("active");
+  expect(a.cloCodes).toEqual(["CLO1"]);
+  expect(a.mappedPlos).toEqual([]);
+  expect(a.dueWeek).toBeUndefined();
+
+  expect(AssessmentPlanSection.safeParse({ items: [{ id: "a1", name: "", type: "Quiz" }] }).success).toBe(false);
+  expect(AssessmentPlanSection.safeParse({ items: [{ id: "a1", name: "X", type: "Nope" }] }).success).toBe(false);
+});
+
+test("assessmentPlanTotalWeight sums only active assessments", () => {
+  const section = AssessmentPlanSection.parse({
+    items: [
+      { id: "1", name: "A", type: "Assignment", weight: 40, status: "active" },
+      { id: "2", name: "B", type: "Quiz", weight: 60, status: "active" },
+      { id: "3", name: "C", type: "Exam", weight: 30, status: "inactive" },
+    ],
+  });
+  expect(assessmentPlanTotalWeight(section)).toBe(100);
+});
+
+test("assessmentPlan is registered in SPEC_SECTION_SCHEMAS", () => {
+  expect(SPEC_SECTION_SCHEMAS.assessmentPlan).toBe(AssessmentPlanSection);
 });

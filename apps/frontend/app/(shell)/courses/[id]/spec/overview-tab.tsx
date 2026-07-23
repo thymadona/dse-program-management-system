@@ -17,6 +17,7 @@ import type { CloForm } from "./clos-section";
 import type { CloMappingForm } from "./clo-mapping-section";
 import type { WeeklyPlanForm } from "./weekly-plan-section";
 import { weekSltForm, weeklyPlanFormTotals } from "./weekly-plan-model";
+import { assessmentTotalWeight, assessmentTypeChip, type AssessmentForm } from "./assessment-model";
 import { ProgrammeSection } from "./programme-section";
 
 export function OverviewTab({
@@ -24,6 +25,7 @@ export function OverviewTab({
   clos,
   cloMapping,
   weeklyPlan,
+  assessments,
   status,
   onEditCourseInfo,
   onGoToTab,
@@ -32,6 +34,7 @@ export function OverviewTab({
   clos: CloForm[];
   cloMapping: CloMappingForm[];
   weeklyPlan: WeeklyPlanForm;
+  assessments: AssessmentForm[];
   status: Record<string, SpecSectionStatus>;
   onEditCourseInfo: () => void;
   onGoToTab: (id: SpecSectionId) => void;
@@ -159,6 +162,64 @@ export function OverviewTab({
                       Total SLT ({weeklyPlan.length} {weeklyPlan.length === 1 ? "week" : "weeks"})
                     </td>
                     <td className="py-1.5 text-right">{planTotals.slt} h</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        {/* Assessment */}
+        <Card>
+          <CardHeader
+            title="Assessment"
+            action={
+              <button
+                type="button"
+                onClick={() => onGoToTab("assessmentPlan")}
+                className="text-sm font-medium text-accent-foreground hover:underline"
+              >
+                View All
+              </button>
+            }
+          />
+          {assessments.length === 0 ? (
+            <EmptyHint text="No assessments yet." action="Go to Assessment" onClick={() => onGoToTab("assessmentPlan")} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-muted-foreground">
+                    <th className="py-1.5 pr-2 font-medium">Assessment</th>
+                    <th className="py-1.5 pr-2 font-medium">Type</th>
+                    <th className="py-1.5 pr-2 font-medium">CLOs</th>
+                    <th className="py-1.5 text-right font-medium">Weight</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assessments.slice(0, 6).map((a) => (
+                    <tr key={a.id} className="border-t border-border">
+                      <td className="py-1.5 pr-2 text-foreground">{a.name || "Untitled"}</td>
+                      <td className="py-1.5 pr-2">
+                        <span
+                          className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium ${assessmentTypeChip(a.type)}`}
+                        >
+                          {a.type}
+                        </span>
+                      </td>
+                      <td className="py-1.5 pr-2 text-muted-foreground">
+                        {a.cloCodes.length ? a.cloCodes.join(", ") : "—"}
+                      </td>
+                      <td className="py-1.5 text-right text-foreground">{a.weight === "" ? "—" : `${a.weight}%`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-border text-xs font-medium text-muted-foreground">
+                    <td className="py-1.5 pr-2" colSpan={3}>
+                      Total ({assessments.length} {assessments.length === 1 ? "assessment" : "assessments"})
+                    </td>
+                    <td className="py-1.5 text-right">{Math.round(assessmentTotalWeight(assessments) * 100) / 100}%</td>
                   </tr>
                 </tfoot>
               </table>
