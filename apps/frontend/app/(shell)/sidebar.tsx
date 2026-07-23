@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import type { PluginRoute } from "@dse-pms/shared-types";
 import { getNavRoutes, iconMap } from "@/lib/nav";
+import { useMe } from "@/lib/auth";
 import { coursesApi, type CourseView } from "@/lib/courses";
 import {
   Sidebar as SidebarPrimitive,
@@ -28,7 +29,10 @@ import {
 /** Sidebar follows the canvas theme (white in light mode, near-black in dark), collapsible to icons. Nav items come from the plugin manifest. */
 export function AppSidebar() {
   const pathname = usePathname();
-  const routes = getNavRoutes();
+  const { me, loading } = useMe();
+  // Only show nav the caller's role is allowed to see. While `me` loads we show
+  // skeletons rather than the full list, so restricted items never flash in.
+  const routes = me ? getNavRoutes(me.role) : [];
 
   return (
     <SidebarPrimitive collapsible="icon" className="border-r-0 bg-sidebar text-sidebar-foreground">
@@ -48,6 +52,13 @@ export function AppSidebar() {
           <SidebarGroupLabel className="text-sidebar-muted">Plugins</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
+              {loading
+                ? Array.from({ length: 3 }).map((_, i) => (
+                    <SidebarMenuItem key={i}>
+                      <SidebarMenuSkeleton showIcon />
+                    </SidebarMenuItem>
+                  ))
+                : null}
               {routes.map((route) => {
                 const Icon = route.icon ? iconMap[route.icon] : undefined;
                 // Course Management gets an expandable list of courses; each course

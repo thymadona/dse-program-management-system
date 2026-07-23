@@ -5,6 +5,8 @@
  * import this file, the contract can never drift between them.
  */
 
+import type { Role } from "./auth.ts";
+
 export interface PluginRoute {
   /** Label shown in the sidebar. */
   label: string;
@@ -12,6 +14,12 @@ export interface PluginRoute {
   path: string;
   /** Optional icon key resolved by the frontend nav. */
   icon?: string;
+  /**
+   * Roles allowed to see this route in the sidebar and open its page.
+   * Omitted = visible to every authenticated role. Enforced on the frontend
+   * (sidebar filter + shell page guard); backend permission strings gate the API.
+   */
+  roles?: Role[];
 }
 
 /**
@@ -52,7 +60,7 @@ export const studentsManifest: PluginManifest = {
   name: "Students",
   version: "0.1.0",
   description: "Student records — CRUD, list, profile.",
-  routes: [{ label: "Students", path: "/students", icon: "users" }],
+  routes: [{ label: "Students", path: "/students", icon: "users", roles: ["admin"] }],
   permissions: ["students:read", "students:write"],
 };
 
@@ -61,7 +69,7 @@ export const coursesManifest: PluginManifest = {
   name: "Courses",
   version: "0.1.0",
   description: "Courses — CRUD, list, assign lecturer.",
-  routes: [{ label: "Course Management", path: "/courses", icon: "book" }],
+  routes: [{ label: "Course Management", path: "/courses", icon: "book", roles: ["admin", "lecturer"] }],
   permissions: ["courses:read", "courses:write", "courses:manage"],
 };
 
@@ -70,7 +78,7 @@ export const offeringsManifest: PluginManifest = {
   name: "Course Offerings",
   version: "0.1.0",
   description: "Links Students, Courses and Lecturers for a given term.",
-  routes: [{ label: "Course Offerings", path: "/offerings", icon: "layers" }],
+  routes: [{ label: "Course Offerings", path: "/offerings", icon: "layers", roles: ["admin"] }],
   permissions: ["offerings:read", "offerings:write", "offerings:manage"],
 };
 
@@ -79,7 +87,7 @@ export const lecturersManifest: PluginManifest = {
   name: "Lecturers",
   version: "0.1.0",
   description: "Lecturers — Users with the lecturer role, incl. syllabus contact details.",
-  routes: [{ label: "Lecturers", path: "/lecturers", icon: "presentation" }],
+  routes: [{ label: "Lecturers", path: "/lecturers", icon: "presentation", roles: ["admin"] }],
   permissions: ["lecturers:read", "lecturers:write"],
 };
 
@@ -109,7 +117,17 @@ export const pluginManifests: PluginManifest[] = [
   authManifest,
 ];
 
+/** Whether `route` is visible to `role` (a route with no `roles` is open to all). */
+export function routeAllowsRole(route: PluginRoute, role: Role): boolean {
+  return route.roles === undefined || route.roles.includes(role);
+}
+
 /** Sidebar nav is generated automatically from plugin routes. */
 export function navFromManifests(manifests: PluginManifest[]): PluginRoute[] {
   return manifests.flatMap((m) => m.routes ?? []);
+}
+
+/** Nav routes a given role may see — `navFromManifests` filtered by `roles`. */
+export function navForRole(manifests: PluginManifest[], role: Role): PluginRoute[] {
+  return navFromManifests(manifests).filter((r) => routeAllowsRole(r, role));
 }

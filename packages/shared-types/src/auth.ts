@@ -13,10 +13,14 @@ export const CreateAccountInput = z.object({
 });
 export type CreateAccountInput = z.infer<typeof CreateAccountInput>;
 
+/** The three application roles. Shared so nav/permission gating can key off it. */
+export const Role = z.enum(["admin", "lecturer", "student"]);
+export type Role = z.infer<typeof Role>;
+
 /** Shape returned by GET /api/auth/me — the resolved caller. */
 export const MeResponse = z.object({
   id: z.string(),
   email: z.string().email(),
-  role: z.enum(["admin", "lecturer", "student"]),
+  role: Role,
 });
 export type MeResponse = z.infer<typeof MeResponse>;

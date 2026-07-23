@@ -6,7 +6,13 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { navFromManifests, pluginManifests, type PluginRoute } from "@dse-pms/shared-types";
+import {
+  navForRole,
+  navFromManifests,
+  pluginManifests,
+  type PluginRoute,
+  type Role,
+} from "@dse-pms/shared-types";
 
 /**
  * Sidebar nav is generated automatically from the shared plugin manifest — the
@@ -21,6 +27,7 @@ export const iconMap: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
 };
 
-export function getNavRoutes(): PluginRoute[] {
-  return navFromManifests(pluginManifests);
+/** All nav routes, or — when a role is given — only those that role may see. */
+export function getNavRoutes(role?: Role): PluginRoute[] {
+  return role ? navForRole(pluginManifests, role) : navFromManifests(pluginManifests);
 }
