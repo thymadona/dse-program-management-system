@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -59,6 +59,13 @@ import {
   toWeeklyPlanPayload,
   type WeeklyPlanForm,
 } from "./weekly-plan-section";
+import {
+  AssessmentSection,
+  EMPTY_ASSESSMENTS,
+  toAssessmentForm,
+  toAssessmentPayload,
+  type AssessmentForm,
+} from "./assessment-section";
 import { OverviewTab } from "./overview-tab";
 
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
@@ -98,6 +105,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
   const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanForm>(EMPTY_WEEKLY_PLAN);
+  const [assessments, setAssessments] = useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
@@ -121,6 +129,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setClos(toClosForm(spec.data.clos));
       setCloMapping(toCloMappingForm(spec.data.cloMapping));
       setWeeklyPlan(toWeeklyPlanForm(spec.data.slt));
+      setAssessments(toAssessmentForm(spec.data.assessmentPlan));
       setStatus(spec.status ?? {});
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
@@ -148,6 +157,27 @@ export function SpecClient({ courseId }: { courseId: string }) {
         await courseSpecApi.saveSection(courseId, "clos", toClosPayload(items));
         setStatus((s) => ({ ...s, clos: "complete" }));
         setClosSavedAt(new Date());
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to save this section");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId],
+  );
+
+  // §17 saves per action (add / edit / duplicate / delete), like §14, so it persists
+  // an explicit list rather than reading possibly-stale `assessments` state.
+  const persistAssessments = useCallback(
+    async (items: AssessmentForm[]) => {
+      setAssessments(items);
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(courseId, "assessmentPlan", toAssessmentPayload(items));
+        setStatus((s) => ({ ...s, assessmentPlan: "complete" }));
         return true;
       } catch (err) {
         setError(err instanceof ApiError ? err.message : "Failed to save this section");
@@ -191,7 +221,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
     [courseId, courseInfo, clos, cloMapping, weeklyPlan, courseTotalSlt],
   );
 
-  const activeMeta = useMemo(() => sectionMeta(activeTab), [activeTab]);
   const canSaveActive = activeTab === "cloMapping" || activeTab === "slt";
 
   const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
@@ -255,6 +284,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               clos={clos}
               cloMapping={cloMapping}
               weeklyPlan={weeklyPlan}
+              assessments={assessments}
               status={status}
               onEditCourseInfo={() => setCourseInfoDialogOpen(true)}
               onGoToTab={(id) => setActiveTab(id)}
@@ -295,9 +325,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
           </TabsContent>
 
           <TabsContent value="assessmentPlan" className="mt-4">
-            <SectionPanel>
-              <ComingSoon meta={activeMeta} />
-            </SectionPanel>
+            <AssessmentSection value={assessments} courseId={courseId} onPersist={persistAssessments} />
           </TabsContent>
 
           <TabsContent value="resources" className="mt-4">

@@ -38,7 +38,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
   { id: "clos", title: "Course Learning Outcomes", ref: "§14", part: "Part 2", state: "ready" },
   { id: "cloMapping", title: "CLO → PLO Mapping & Methods", ref: "§15", part: "Part 2", state: "ready" },
   { id: "slt", title: "Weekly Plan", ref: "§18", part: "Part 2", state: "ready" },
-  { id: "assessmentPlan", title: "Course Assessment Plan", ref: "§17", part: "Part 2", state: "soon" },
+  { id: "assessmentPlan", title: "Course Assessment Plan", ref: "§17", part: "Part 2", state: "ready" },
   { id: "resources", title: "Required Resources", ref: "§19", part: "Part 2", state: "soon" },
   { id: "references", title: "References / Textbooks", ref: "§20", part: "Part 2", state: "soon" },
   { id: "responsibility", title: "Student Responsibility", ref: "§21", part: "Part 2", state: "soon" },
@@ -123,6 +123,45 @@ export const LEARNING_ACTIVITIES: readonly string[] = [
 export const GROUP_INDIVIDUAL: readonly { code: string; name: string }[] = [
   { code: "I", name: "Individual" },
   { code: "G", name: "Group" },
+] as const;
+
+/** §17 assessment types — the vocabulary for the "Type" column and picker. */
+export const ASSESSMENT_TYPES = [
+  "Assignment",
+  "Quiz",
+  "Exam",
+  "Lab",
+  "Project",
+  "Presentation",
+  "Report",
+  "Peer Evaluation",
+  "Participation",
+] as const;
+
+/**
+ * §17 assessment format / deliverables — presets for the "Assessment Format /
+ * Deliverables" picker. Lecturers may type their own, so this is a starting list.
+ */
+export const ASSESSMENT_FORMATS: readonly string[] = [
+  "Written Report",
+  "Presentation Slides",
+  "Source Code",
+  "Oral Presentation",
+  "Poster",
+  "Portfolio",
+  "Video",
+  "Written Exam",
+  "Practical Exam",
+] as const;
+
+/** §17 submission methods — presets for the "Submission Method" picker. */
+export const SUBMISSION_METHODS: readonly string[] = [
+  "LMS (Upload)",
+  "In Class",
+  "Email",
+  "Printed Copy",
+  "Online Quiz",
+  "Live Presentation",
 ] as const;
 
 /** §24 letter-grade rating scale (fixed programme standard). */
@@ -299,12 +338,70 @@ export function weeklyPlanTotals(section: WeeklyPlanSection) {
   );
 }
 
+/* --------------------------------------- §17 Course Assessment Plan */
+
+/** An assessment's type (Assignment, Quiz, …), validated against ASSESSMENT_TYPES. */
+export const AssessmentType = z.enum(ASSESSMENT_TYPES);
+export type AssessmentType = z.infer<typeof AssessmentType>;
+
+/** Whether an assessment is done individually or as a group. */
+export const AssessmentMode = z.enum(["individual", "group"]);
+export type AssessmentMode = z.infer<typeof AssessmentMode>;
+
+/** Whether an assessment counts toward the plan's weighting and reports. */
+export const AssessmentStatus = z.enum(["active", "inactive"]);
+export type AssessmentStatus = z.infer<typeof AssessmentStatus>;
+
+/**
+ * One §17 assessment. `cloCodes` reference §14 CLOs by code and `mappedPlos` the
+ * Part 1 PLOs; `bloomLevel` is the targeted C/A/P level. `weight` is a percentage
+ * of the final grade — the plan's weights are expected to total 100 across active
+ * rows, checked in the UI rather than enforced per-row here.
+ */
+export const AssessmentItem = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1, "An assessment name is required"),
+  type: AssessmentType,
+  description: z.string().default(""),
+  mode: AssessmentMode.default("individual"),
+  status: AssessmentStatus.default("active"),
+  // Linking.
+  cloCodes: z.array(z.string()).default([]),
+  bloomLevel: CapLevel.nullable().optional(),
+  // Weighting & scheduling.
+  weight: z.coerce.number().min(0).max(100).nullable().default(null),
+  dueWeek: z.coerce.number().int().min(1).max(52).nullable().optional(),
+  durationWeeks: z.coerce.number().min(0).max(52).nullable().optional(),
+  // Details.
+  format: z.string().default(""),
+  submissionMethod: z.string().default(""),
+  instructions: z.string().default(""),
+  rubric: z.string().default(""),
+  // PLO mapping & notes.
+  mappedPlos: z.array(PloId).default([]),
+  notes: z.string().default(""),
+});
+export type AssessmentItem = z.infer<typeof AssessmentItem>;
+
+export const AssessmentPlanSection = z.object({
+  items: z.array(AssessmentItem).default([]),
+});
+export type AssessmentPlanSection = z.infer<typeof AssessmentPlanSection>;
+
+/** Total weight (%) across active assessments — the figure the plan should sum to 100. */
+export function assessmentPlanTotalWeight(section: AssessmentPlanSection): number {
+  return section.items
+    .filter((a) => a.status === "active")
+    .reduce((sum, a) => sum + (a.weight ?? 0), 0);
+}
+
 /** Zod schema for a given section id. Extend as later phases add sections. */
 export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
   courseInfo: CourseInfoSection,
   clos: ClosSection,
   cloMapping: CloMappingSection,
   slt: WeeklyPlanSection,
+  assessmentPlan: AssessmentPlanSection,
 };
 
 /* ------------------------------------------------------------- spec envelope */
