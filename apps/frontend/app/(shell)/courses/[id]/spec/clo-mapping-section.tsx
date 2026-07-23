@@ -161,7 +161,7 @@ export function CloMappingSection({
       <div className="space-y-4">
         {rows.map((row, i) => {
           const clo = cloFor(row.cloCode);
-          const ploId = clo?.ploId || "";
+          const ploId = clo?.mappedPlos.join(", ") || "";
           const level = clo?.level || "";
           const percent = focusPercentOf(row.sltHours, total);
           const focusCode = focusCodeOf(percent);

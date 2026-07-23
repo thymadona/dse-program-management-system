@@ -255,7 +255,7 @@ export function OverviewTab({
                 return (
                   <li key={clo.code} className="flex items-center justify-between">
                     <span className="text-foreground">
-                      {clo.code} → {clo.ploId || "—"}
+                      {clo.code} → {clo.mappedPlos.length ? clo.mappedPlos.join(", ") : "—"}
                     </span>
                     {focus ? (
                       <span className="rounded-full bg-status-live-bg px-2 py-0.5 text-xs font-medium text-status-live">

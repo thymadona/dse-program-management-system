@@ -84,6 +84,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
   const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
   const [slt, setSlt] = useState<SltForm>(EMPTY_SLT);
+  const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
@@ -122,15 +123,35 @@ export function SpecClient({ courseId }: { courseId: string }) {
     load();
   }, [load]);
 
+  // §14 saves per action (add / edit / duplicate / delete), so it persists an
+  // explicit list rather than reading possibly-stale `clos` state from a closure.
+  const persistClos = useCallback(
+    async (items: CloForm[]) => {
+      setClos(items);
+      setSaving(true);
+      setError(null);
+      try {
+        await courseSpecApi.saveSection(courseId, "clos", toClosPayload(items));
+        setStatus((s) => ({ ...s, clos: "complete" }));
+        setClosSavedAt(new Date());
+        return true;
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Failed to save this section");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId],
+  );
+
   const saveSection = useCallback(
-    async (sectionId: "courseInfo" | "clos" | "cloMapping" | "slt") => {
+    async (sectionId: "courseInfo" | "cloMapping" | "slt") => {
       setSaving(true);
       setError(null);
       try {
         if (sectionId === "courseInfo") {
           await courseSpecApi.saveSection(courseId, "courseInfo", toCourseInfoPayload(courseInfo));
-        } else if (sectionId === "clos") {
-          await courseSpecApi.saveSection(courseId, "clos", toClosPayload(clos));
         } else if (sectionId === "cloMapping") {
           const reconciled = reconcileMapping(clos, cloMapping);
           setCloMapping(reconciled);
@@ -157,8 +178,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   );
 
   const activeMeta = useMemo(() => sectionMeta(activeTab), [activeTab]);
-  const canSaveActive =
-    activeTab === "clos" || activeTab === "cloMapping" || activeTab === "slt";
+  const canSaveActive = activeTab === "cloMapping" || activeTab === "slt";
 
   const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
 
@@ -206,19 +226,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
             ))}
           </TabsList>
 
-          <div className="mt-4 flex items-center justify-end gap-3">
-            {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
-            {canSaveActive ? (
-              <Button
-                variant="outline"
-                onClick={() => saveSection(activeTab as "clos" | "cloMapping" | "slt")}
-                disabled={saving}
-              >
-                {saving ? "Saving…" : "Save"}
-              </Button>
-            ) : null}
-          </div>
-
           <TabsContent value="overview" className="mt-4">
             <OverviewTab
               courseInfo={courseInfo}
@@ -232,9 +239,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
           </TabsContent>
 
           <TabsContent value="clos" className="mt-4">
-            <SectionPanel>
-              <ClosSection value={clos} onChange={setClos} />
-            </SectionPanel>
+            <ClosSection
+              value={clos}
+              assessmentMethods={assessmentMethods}
+              saving={saving}
+              lastSavedAt={closSavedAt}
+              onPersist={persistClos}
+            />
           </TabsContent>
 
           <TabsContent value="slt" className="mt-4">
@@ -286,6 +297,19 @@ export function SpecClient({ courseId }: { courseId: string }) {
               </div>
             </SectionPanel>
           </TabsContent>
+
+          {canSaveActive ? (
+            <div className="mt-4 flex items-center justify-end gap-3">
+              {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
+              <Button
+                variant="outline"
+                onClick={() => saveSection(activeTab as "cloMapping" | "slt")}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          ) : null}
         </Tabs>
       )}
 
