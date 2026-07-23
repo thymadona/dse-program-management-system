@@ -13,13 +13,22 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "students:write",
     "courses:read",
     "courses:write",
+    "courses:manage",
     "offerings:read",
     "offerings:write",
+    "offerings:manage",
     "lecturers:read",
     "lecturers:write",
     "methods:read",
     "methods:write",
   ],
+  // Lecturers get exactly what their job needs: read the catalog, fill in the
+  // specification of the courses/offerings they're assigned to, and grow the
+  // methods vocabulary from the §15 form. They do NOT get "*:manage" (creating,
+  // deleting, or reassigning courses/offerings — a curriculum-admin action) or
+  // "lecturers:write" (editing other lecturers' profiles) or "accounts:create".
+  // Ownership of the specific course/offering is enforced in the route handlers,
+  // not just by holding the permission string.
   lecturer: [
     "students:read",
     "courses:read",
@@ -27,7 +36,6 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
     "offerings:read",
     "offerings:write",
     "lecturers:read",
-    "lecturers:write",
     "methods:read",
     "methods:write",
   ],

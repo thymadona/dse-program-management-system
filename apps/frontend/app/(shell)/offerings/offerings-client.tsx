@@ -14,6 +14,7 @@ import { coursesApi, type CourseView } from "@/lib/courses";
 import { lecturersApi } from "@/lib/lecturers";
 import { offeringsApi, offeringTone } from "@/lib/offerings";
 import { studentsApi } from "@/lib/students";
+import { authApi } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
 import { OfferingForm, type OfferingFormValues } from "./offering-form";
 import { EnrollmentDialog } from "./enrollment-dialog";
@@ -31,6 +32,23 @@ export function OfferingsClient() {
   const [submitting, setSubmitting] = useState(false);
 
   const [manage, setManage] = useState<OfferingView | null>(null);
+
+  // Scheduling an offering (create/edit/delete) is admin-only (offerings:manage);
+  // a lecturer may only manage the roster ("Manage") of an offering they teach.
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  useEffect(() => {
+    authApi
+      .me()
+      .then((me) => {
+        setIsAdmin(me.role === "admin");
+        setCurrentUserId(me.id);
+      })
+      .catch(() => {
+        setIsAdmin(false);
+        setCurrentUserId(null);
+      });
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -82,6 +100,15 @@ export function OfferingsClient() {
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to delete offering");
     }
+  };
+
+  const handleManage = (offering: OfferingView) => {
+    if (!isAdmin && offering.lecturer?.id !== currentUserId) {
+      setError("You can only manage enrollment for offerings you teach.");
+      return;
+    }
+    setError(null);
+    setManage(offering);
   };
 
   // When enrollment changes, patch the row in place and keep the dialog in sync.
@@ -151,11 +178,15 @@ export function OfferingsClient() {
         search=""
         onSearchChange={() => {}}
         searchPlaceholder="Offerings"
-        addLabel="Add Offering"
-        onAdd={() => {
-          setEditing(null);
-          setFormOpen(true);
-        }}
+        addLabel={isAdmin ? "Add Offering" : undefined}
+        onAdd={
+          isAdmin
+            ? () => {
+                setEditing(null);
+                setFormOpen(true);
+              }
+            : undefined
+        }
       />
 
       {error ? (
@@ -174,14 +205,18 @@ export function OfferingsClient() {
             key: "manage",
             label: "Manage",
             icon: <Users className="mr-1 h-3.5 w-3.5" />,
-            onClick: (o) => setManage(o),
+            onClick: handleManage,
           },
         ]}
-        onEdit={(o) => {
-          setEditing(o);
-          setFormOpen(true);
-        }}
-        onDelete={handleDelete}
+        onEdit={
+          isAdmin
+            ? (o) => {
+                setEditing(o);
+                setFormOpen(true);
+              }
+            : undefined
+        }
+        onDelete={isAdmin ? handleDelete : undefined}
         loading={loading}
         emptyMessage="No offerings yet. Add one to link a course, lecturer and students for a term."
       />
