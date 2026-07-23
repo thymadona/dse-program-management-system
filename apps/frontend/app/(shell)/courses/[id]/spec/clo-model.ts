@@ -1,4 +1,4 @@
-import { CAP_LEVELS, COGNITIVE_LEVELS } from "@dse-pms/shared-types";
+import { CAP_LEVELS, cloFocusCode, cloFocusPercent, COGNITIVE_LEVELS } from "@dse-pms/shared-types";
 
 /** A CLO held as a form model for input binding; converted on save by the wizard. */
 export type CloForm = {
@@ -6,6 +6,8 @@ export type CloForm = {
   description: string;
   level: string;
   mappedPlos: string[];
+  sltHours: string;
+  teachingMethodIds: string[];
   assessmentMethodIds: string[];
   status: "active" | "inactive";
   notes: string;
@@ -20,6 +22,8 @@ export function emptyClo(): CloForm {
     description: "",
     level: "",
     mappedPlos: [],
+    sltHours: "",
+    teachingMethodIds: [],
     assessmentMethodIds: [],
     status: "active",
     notes: "",
@@ -34,20 +38,38 @@ export function withCodes(items: CloForm[]): CloForm[] {
 const asStr = (v: unknown) => (v == null ? "" : String(v));
 const asStrArray = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x)) : []);
 
-/** Map the API's §14 payload into the string-based form model, migrating legacy fields. */
-export function toClosForm(data: unknown): CloForm[] {
+/**
+ * Map the API's §14 payload into the string-based form model, migrating legacy
+ * fields. `legacyMapping` is the old §15 `cloMapping` section (now removed) — its
+ * `sltHours`/`teachingMethodIds` are folded into the matching CLO by code when the
+ * CLO itself doesn't already carry them, so courses saved before the §14/§15 merge
+ * don't lose that data. It's read-only migration: nothing is written back until the
+ * lecturer next saves §14.
+ */
+export function toClosForm(data: unknown, legacyMapping?: unknown): CloForm[] {
   const items = (data as { items?: unknown[] } | undefined)?.items ?? [];
+  const legacyItems = (legacyMapping as { items?: unknown[] } | undefined)?.items ?? [];
+  const legacyByCode = new Map(
+    legacyItems.map((raw) => {
+      const d = (raw ?? {}) as Record<string, unknown>;
+      return [asStr(d.cloCode), d] as const;
+    }),
+  );
   return withCodes(
     items.map((raw) => {
       const d = (raw ?? {}) as Record<string, unknown>;
       // Legacy rows carried a single `ploId`; fold it into mappedPlos.
       const mappedPlos = asStrArray(d.mappedPlos);
       if (mappedPlos.length === 0 && d.ploId) mappedPlos.push(String(d.ploId));
+      const legacy = legacyByCode.get(asStr(d.code));
+      const teachingMethodIds = asStrArray(d.teachingMethodIds);
       return {
         code: asStr(d.code),
         description: asStr(d.description),
         level: asStr(d.level),
         mappedPlos,
+        sltHours: d.sltHours != null ? asStr(d.sltHours) : legacy?.sltHours != null ? asStr(legacy.sltHours) : "",
+        teachingMethodIds: teachingMethodIds.length ? teachingMethodIds : asStrArray(legacy?.teachingMethodIds),
         assessmentMethodIds: asStrArray(d.assessmentMethodIds),
         status: d.status === "inactive" ? "inactive" : "active",
         notes: asStr(d.notes),
@@ -64,11 +86,23 @@ export function toClosPayload(items: CloForm[]) {
       description: f.description.trim(),
       level: f.level || null,
       mappedPlos: f.mappedPlos,
+      sltHours: f.sltHours ? Number(f.sltHours) : null,
+      teachingMethodIds: f.teachingMethodIds,
       assessmentMethodIds: f.assessmentMethodIds,
       status: f.status,
       notes: f.notes.trim(),
     })),
   };
+}
+
+/** A CLO's share of the course's total SLT, as a whole percent (string-input wrapper). */
+export function focusPercentOf(sltHours: string, totalSlt: number | null): number | null {
+  return cloFocusPercent(sltHours ? Number(sltHours) : null, totalSlt);
+}
+
+/** F/M/P category derived from a focus percentage. */
+export function focusCodeOf(percent: number | null): string {
+  return cloFocusCode(percent) ?? "";
 }
 
 /* ------------------------------------------------------------- Bloom palette */

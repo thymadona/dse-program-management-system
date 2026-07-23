@@ -3,7 +3,7 @@
 import type { Method } from "@dse-pms/shared-types";
 
 /**
- * A multi-select checkbox list for a §15 method field. Shows a ticked-count
+ * A multi-select checkbox list for a §14 CLO method field. Shows a ticked-count
  * badge and one checkbox per known method.
  */
 export function MethodChecklist({

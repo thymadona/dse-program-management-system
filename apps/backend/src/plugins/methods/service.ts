@@ -2,8 +2,8 @@ import type { CreateMethodInput, Method, MethodsResponse } from "@dse-pms/shared
 import { prisma } from "../../core/db/prisma.ts";
 
 /**
- * Method vocabulary business logic. Two global reference tables read by the §15
- * course-spec form. Adding a method is idempotent on `name`: an existing name
+ * Method vocabulary business logic. Two global reference tables read by the §14
+ * CLO course-spec form. Adding a method is idempotent on `name`: an existing name
  * returns the existing row (created=false) rather than erroring.
  */
 export const methodService = {

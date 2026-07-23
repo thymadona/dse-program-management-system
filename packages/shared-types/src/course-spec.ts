@@ -36,7 +36,6 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
   { id: "programme", title: "Programme", ref: "Part 1", part: "Part 1", state: "ready" },
   { id: "courseInfo", title: "Course Information", ref: "§1–13", part: "Part 2", state: "ready" },
   { id: "clos", title: "Course Learning Outcomes", ref: "§14", part: "Part 2", state: "ready" },
-  { id: "cloMapping", title: "CLO → PLO Mapping & Methods", ref: "§15", part: "Part 2", state: "ready" },
   { id: "slt", title: "Weekly Plan", ref: "§18", part: "Part 2", state: "ready" },
   { id: "assessmentPlan", title: "Course Assessment Plan", ref: "§17", part: "Part 2", state: "ready" },
   { id: "mapping", title: "CLO Alignment Mapping", ref: "§14–18", part: "Part 2", state: "ready" },
@@ -93,7 +92,7 @@ export const PSYCHOMOTOR_LEVELS: readonly LevelGuideEntry[] = [
   { code: "P7", name: "Origination" },
 ] as const;
 
-/** §15 focus of a CLO on a PLO relative to total SLT. */
+/** §14 focus of a CLO on its mapped PLOs relative to total SLT. */
 export const FOCUS_LEVELS: readonly { code: string; name: string; hint: string }[] = [
   { code: "F", name: "Fully", hint: "more than 50% of total SLT" },
   { code: "M", name: "Moderate", hint: "31%–50% of total SLT" },
@@ -177,7 +176,7 @@ export const LETTER_GRADES: readonly { grade: string; point: string; score: stri
   { grade: "F", point: "0.00", score: "<50", label: "Fail" },
 ] as const;
 
-/** The ten programme learning outcomes (Part 1). Referenced by CLOs in §14/§15. */
+/** The ten programme learning outcomes (Part 1). Referenced by CLOs in §14. */
 export const PLOS: readonly { id: string; description: string }[] = [
   { id: "PLO1", description: "Apply knowledge in data science and engineering to develop appropriate solutions for real-world problems." },
   { id: "PLO2", description: "Analyze data-related problems using logical reasoning and systems thinking." },
@@ -195,7 +194,7 @@ export const PLO_IDS = ["PLO1", "PLO2", "PLO3", "PLO4", "PLO5", "PLO6", "PLO7", 
 export const PloId = z.enum(PLO_IDS);
 export type PloId = z.infer<typeof PloId>;
 
-/** Every C/A/P Bloom level, flattened — drives the §14/§15 "C/A/P Level" dropdown. */
+/** Every C/A/P Bloom level, flattened — drives the §14 "C/A/P Level" dropdown. */
 export const CAP_LEVELS: readonly LevelGuideEntry[] = [
   ...COGNITIVE_LEVELS,
   ...AFFECTIVE_LEVELS,
@@ -209,7 +208,7 @@ export const CapLevel = z
   .string()
   .refine((v) => CAP_LEVEL_CODES.has(v), { message: "Unknown C/A/P level" });
 
-/** §15 focus code (F/M/P) relative to total SLT on a PLO. */
+/** §14 focus code (F/M/P) relative to total SLT on a CLO's mapped PLOs. */
 export const FocusCode = z.enum(["F", "M", "P"]);
 export type FocusCode = z.infer<typeof FocusCode>;
 
@@ -252,14 +251,20 @@ export type CloStatus = z.infer<typeof CloStatus>;
 /**
  * One Course Learning Outcome (§14). `code` (CLO1, CLO2…) is assigned by position.
  * A CLO sits at one C/A/P Bloom level and contributes to one or more PLOs; the
- * assessment methods that measure it reference the shared `methods` vocabulary.
- * `mappedPlos`/`assessmentMethodIds` are the source of truth the §15 mapping reads.
+ * teaching/assessment methods reference the shared `methods` vocabulary. `sltHours`
+ * is the Student Learning Time this CLO accounts for — the sum across a course's
+ * CLOs must equal the course's total SLT — and its Focus (F/M/P) is derived from
+ * that share, not stored (see `cloFocusPercent`/`cloFocusCode` below). This section
+ * used to be split across §14 (outcome + PLO) and a separate §15 mapping section
+ * (SLT + methods); they were merged into one per-CLO form.
  */
 export const CloItem = z.object({
   code: z.string().min(1),
   description: z.string().min(1, "Describe what students will be able to do"),
   level: CapLevel.nullable().optional(),
   mappedPlos: z.array(PloId).default([]),
+  sltHours: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+  teachingMethodIds: z.array(z.string()).default([]),
   assessmentMethodIds: z.array(z.string()).default([]),
   status: CloStatus.default("active"),
   notes: z.string().default(""),
@@ -271,26 +276,19 @@ export const ClosSection = z.object({
 });
 export type ClosSection = z.infer<typeof ClosSection>;
 
-/* ------------------- §15 CLO → PLO mapping, teaching & assessment methods */
+/** A CLO's share of the course's total SLT, as a whole percent. `null` when not yet computable. */
+export function cloFocusPercent(sltHours: number | null | undefined, totalSlt: number | null | undefined): number | null {
+  if (!totalSlt || !sltHours) return null;
+  return Math.round((sltHours / totalSlt) * 100);
+}
 
-/**
- * One CLO's §15 mapping row: SLT hours + focus on its PLO, plus teaching and
- * assessment methods. `cloCode` references a CLO defined in §14.
- */
-export const CloMappingItem = z.object({
-  cloCode: z.string().min(1),
-  sltHours: z.coerce.number().int().min(0).max(1000).nullable().optional(),
-  focus: FocusCode.nullable().optional(),
-  focusPercent: z.coerce.number().int().min(0).max(100).nullable().optional(),
-  teachingMethodIds: z.array(z.string()).default([]),
-  assessmentMethodIds: z.array(z.string()).default([]),
-});
-export type CloMappingItem = z.infer<typeof CloMappingItem>;
-
-export const CloMappingSection = z.object({
-  items: z.array(CloMappingItem),
-});
-export type CloMappingSection = z.infer<typeof CloMappingSection>;
+/** F/M/P category derived from a focus percentage (legend: F >50%, M 31–50%, P ≤30%). */
+export function cloFocusCode(percent: number | null): FocusCode | null {
+  if (percent == null) return null;
+  if (percent > 50) return "F";
+  if (percent >= 31) return "M";
+  return "P";
+}
 
 /* --------------------------------------- §18 Weekly Plan (Course Outline & Lesson Plan) */
 
@@ -500,7 +498,6 @@ export function componentsMapped(
 export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
   courseInfo: CourseInfoSection,
   clos: ClosSection,
-  cloMapping: CloMappingSection,
   slt: WeeklyPlanSection,
   assessmentPlan: AssessmentPlanSection,
   mapping: MappingSection,

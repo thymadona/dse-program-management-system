@@ -7,7 +7,7 @@ export const MethodSchema = z.object({
 });
 export type Method = z.infer<typeof MethodSchema>;
 
-/** Which §15 vocabulary a method belongs to. Also the POST route segment. */
+/** Which method vocabulary (used by the §14 CLO form) a method belongs to. Also the POST route segment. */
 export type MethodKind = "teaching" | "assessment";
 
 /** Body for adding a method: trimmed, non-empty. */

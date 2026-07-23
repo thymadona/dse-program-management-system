@@ -46,13 +46,6 @@ import {
   type CloForm,
 } from "./clos-section";
 import {
-  CloMappingSection,
-  reconcileMapping,
-  toCloMappingForm,
-  toCloMappingPayload,
-  type CloMappingForm,
-} from "./clo-mapping-section";
-import {
   WeeklyPlanSectionForm,
   EMPTY_WEEKLY_PLAN,
   toWeeklyPlanForm,
@@ -82,7 +75,6 @@ type TabId = "overview" | "documentPreview" | SpecSectionId;
 const TABS: { id: TabId; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "clos", label: "CLOs" },
-  { id: "cloMapping", label: "CLO → PLO" },
   { id: "slt", label: "Weekly Plan" },
   { id: "assessmentPlan", label: "Assessment" },
   { id: "resources", label: "Resources" },
@@ -112,13 +104,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [status, setStatus] = useState<Record<string, SpecSectionStatus>>({});
   const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
-  const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanForm>(EMPTY_WEEKLY_PLAN);
   const [assessments, setAssessments] = useState<AssessmentForm[]>(EMPTY_ASSESSMENTS);
   const [mapping, setMapping] = useState<MappingForm>(EMPTY_MAPPING);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
-  const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -136,13 +126,11 @@ export function SpecClient({ courseId }: { courseId: string }) {
         coursesApi.get(courseId),
       ]);
       setCourseInfo(toCourseInfoForm(spec.data.courseInfo as Record<string, unknown> | undefined));
-      setClos(toClosForm(spec.data.clos));
-      setCloMapping(toCloMappingForm(spec.data.cloMapping));
+      setClos(toClosForm(spec.data.clos, spec.data.cloMapping));
       setWeeklyPlan(toWeeklyPlanForm(spec.data.slt));
       setAssessments(toAssessmentForm(spec.data.assessmentPlan));
       setMapping(toMappingForm(spec.data.mapping));
       setStatus(spec.status ?? {});
-      setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
       setCourse(courseView);
       setCourseTotalSlt(courseView.totalSltHours ?? null);
@@ -201,20 +189,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
   );
 
   const saveSection = useCallback(
-    async (sectionId: "courseInfo" | "cloMapping" | "slt" | "mapping") => {
+    async (sectionId: "courseInfo" | "slt" | "mapping") => {
       setSaving(true);
       setError(null);
       try {
         if (sectionId === "courseInfo") {
           await courseSpecApi.saveSection(courseId, "courseInfo", toCourseInfoPayload(courseInfo));
-        } else if (sectionId === "cloMapping") {
-          const reconciled = reconcileMapping(clos, cloMapping);
-          setCloMapping(reconciled);
-          await courseSpecApi.saveSection(
-            courseId,
-            "cloMapping",
-            toCloMappingPayload(reconciled, courseTotalSlt),
-          );
         } else if (sectionId === "slt") {
           await courseSpecApi.saveSection(courseId, "slt", toWeeklyPlanPayload(weeklyPlan));
         } else if (sectionId === "mapping") {
@@ -234,11 +214,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setSaving(false);
       }
     },
-    [courseId, courseInfo, clos, cloMapping, weeklyPlan, assessments, mapping, courseTotalSlt],
+    [courseId, courseInfo, clos, weeklyPlan, assessments, mapping],
   );
 
-  const canSaveActive =
-    activeTab === "cloMapping" || activeTab === "slt" || activeTab === "mapping";
+  const canSaveActive = activeTab === "slt" || activeTab === "mapping";
 
   const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
   const activeTabLabel = TABS.find((t) => t.id === activeTab)?.label;
@@ -299,10 +278,10 @@ export function SpecClient({ courseId }: { courseId: string }) {
             <OverviewTab
               courseInfo={courseInfo}
               clos={clos}
-              cloMapping={cloMapping}
               weeklyPlan={weeklyPlan}
               assessments={assessments}
               status={status}
+              courseTotalSlt={courseTotalSlt}
               onEditCourseInfo={() => setCourseInfoDialogOpen(true)}
               onGoToTab={(id) => setActiveTab(id)}
             />
@@ -313,6 +292,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               value={clos}
               courseId={courseId}
               assessmentMethods={assessmentMethods}
+              courseTotalSlt={courseTotalSlt}
               lastSavedAt={closSavedAt}
               onPersist={persistClos}
             />
@@ -326,19 +306,6 @@ export function SpecClient({ courseId }: { courseId: string }) {
               courseName={course ? `${course.code} - ${course.title}` : undefined}
               cloCodes={clos.map((c) => c.code)}
             />
-          </TabsContent>
-
-          <TabsContent value="cloMapping" className="mt-4">
-            <SectionPanel>
-              <CloMappingSection
-                clos={clos}
-                value={cloMapping}
-                onChange={setCloMapping}
-                teachingMethods={teachingMethods}
-                assessmentMethods={assessmentMethods}
-                courseTotalSlt={courseTotalSlt}
-              />
-            </SectionPanel>
           </TabsContent>
 
           <TabsContent value="assessmentPlan" className="mt-4">
@@ -386,7 +353,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               {savedFlash ? <span className="text-sm text-emerald-600">Saved ✓</span> : null}
               <Button
                 variant="outline"
-                onClick={() => saveSection(activeTab as "cloMapping" | "slt" | "mapping")}
+                onClick={() => saveSection(activeTab as "slt" | "mapping")}
                 disabled={saving}
               >
                 {saving ? "Saving…" : "Save"}

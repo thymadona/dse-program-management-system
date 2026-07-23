@@ -13,8 +13,7 @@ import {
 } from "@dse-pms/shared-types";
 import { Button, CompletionRing } from "@dse-pms/ui";
 import type { CourseInfoForm } from "./course-info-section";
-import type { CloForm } from "./clos-section";
-import type { CloMappingForm } from "./clo-mapping-section";
+import { focusCodeOf, focusPercentOf, type CloForm } from "./clo-model";
 import type { WeeklyPlanForm } from "./weekly-plan-section";
 import { weekSltForm, weeklyPlanFormTotals } from "./weekly-plan-model";
 import { assessmentTotalWeight, assessmentTypeChip, type AssessmentForm } from "./assessment-model";
@@ -23,19 +22,20 @@ import { ProgrammeSection } from "./programme-section";
 export function OverviewTab({
   courseInfo,
   clos,
-  cloMapping,
   weeklyPlan,
   assessments,
   status,
+  courseTotalSlt,
   onEditCourseInfo,
   onGoToTab,
 }: {
   courseInfo: CourseInfoForm;
   clos: CloForm[];
-  cloMapping: CloMappingForm[];
   weeklyPlan: WeeklyPlanForm;
   assessments: AssessmentForm[];
   status: Record<string, SpecSectionStatus>;
+  /** Course's total SLT hours, used to derive each CLO's Focus (F/M/P) from its share. */
+  courseTotalSlt: number | null;
   onEditCourseInfo: () => void;
   onGoToTab: (id: SpecSectionId) => void;
 }) {
@@ -285,7 +285,7 @@ export function OverviewTab({
         <Card>
           <CardHeader title="Quick Actions" />
           <ul className="divide-y divide-border text-sm">
-            <QuickAction label="CLO → PLO Mapping" onClick={() => onGoToTab("cloMapping")} />
+            <QuickAction label="CLOs & PLO Mapping" onClick={() => onGoToTab("clos")} />
             <QuickAction label="Assessment" onClick={() => onGoToTab("assessmentPlan")} />
             <QuickAction label="Weekly Plan" onClick={() => onGoToTab("slt")} />
           </ul>
@@ -298,7 +298,7 @@ export function OverviewTab({
             action={
               <button
                 type="button"
-                onClick={() => onGoToTab("cloMapping")}
+                onClick={() => onGoToTab("clos")}
                 className="text-sm font-medium text-accent-foreground hover:underline"
               >
                 View Full Mapping
@@ -311,8 +311,8 @@ export function OverviewTab({
           ) : (
             <ul className="space-y-1.5 text-sm">
               {clos.map((clo) => {
-                const mapping = cloMapping.find((m) => m.cloCode === clo.code);
-                const focus = FOCUS_LEVELS.find((f) => f.code === mapping?.focus);
+                const percent = focusPercentOf(clo.sltHours, courseTotalSlt);
+                const focus = FOCUS_LEVELS.find((f) => f.code === focusCodeOf(percent));
                 return (
                   <li key={clo.code} className="flex items-center justify-between">
                     <span className="text-foreground">

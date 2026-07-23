@@ -95,7 +95,7 @@ export const methodsManifest: PluginManifest = {
   id: "methods",
   name: "Methods",
   version: "0.1.0",
-  description: "Teaching & assessment method vocabulary for course specs (§15).",
+  description: "Teaching & assessment method vocabulary for course specs (§14).",
   permissions: ["methods:read", "methods:write"],
 };
 

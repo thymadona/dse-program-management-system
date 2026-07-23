@@ -12,7 +12,7 @@ import { ReferenceGuide } from "./reference-guide";
 /**
  * Part 1 is programme-level and identical for every course, so it is shown here as
  * read-only reference rather than something the lecturer fills. This step also hosts
- * the Bloom-style level guides the lecturer will reference in later sections (§14/§15).
+ * the Bloom-style level guides the lecturer will reference when writing CLOs (§14).
  */
 export function ProgrammeSection() {
   return (
@@ -31,8 +31,8 @@ export function ProgrammeSection() {
       <div>
         <p className="mb-2 text-sm font-medium text-foreground">Reference guides</p>
         <p className="mb-3 text-xs text-muted-foreground">
-          You&apos;ll use these when writing Course Learning Outcomes (§14) and the CLO → PLO mapping
-          (§15). Open each to see what the level codes mean.
+          You&apos;ll use these when writing Course Learning Outcomes and their PLO mapping (§14).
+          Open each to see what the level codes mean.
         </p>
         <div className="grid gap-3">
           <ReferenceGuide title="Cognitive levels (C1–C6)" rows={[...COGNITIVE_LEVELS]} defaultOpen />
