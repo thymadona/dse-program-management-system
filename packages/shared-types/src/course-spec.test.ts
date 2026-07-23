@@ -7,6 +7,14 @@ import {
   SPEC_SECTION_SCHEMAS,
   weekSlt,
   weeklyPlanTotals,
+  MappingSection,
+  MappingCell,
+  alignmentBand,
+  meanStrength,
+  mappingOverallPercent,
+  mappingDistribution,
+  cloAlignmentAverages,
+  componentsMapped,
 } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
@@ -118,4 +126,67 @@ test("assessmentPlanTotalWeight sums only active assessments", () => {
 
 test("assessmentPlan is registered in SPEC_SECTION_SCHEMAS", () => {
   expect(SPEC_SECTION_SCHEMAS.assessmentPlan).toBe(AssessmentPlanSection);
+});
+
+/* --------------------------------------------------- Alignment Mapping (§14–18) */
+
+test("MappingSection defaults cells to [] and coerces string strengths", () => {
+  expect(MappingSection.parse({}).cells).toEqual([]);
+  const parsed = MappingSection.parse({
+    cells: [{ cloCode: "CLO1", kind: "week", ref: "w1", strength: "3" }],
+  });
+  expect(parsed.cells[0]!.strength).toBe(3);
+});
+
+test("MappingCell rejects strengths out of range and unknown kinds", () => {
+  expect(MappingCell.safeParse({ cloCode: "CLO1", kind: "week", ref: "w1", strength: 4 }).success).toBe(false);
+  expect(MappingCell.safeParse({ cloCode: "CLO1", kind: "exam", ref: "w1", strength: 2 }).success).toBe(false);
+  expect(MappingCell.safeParse({ cloCode: "", kind: "week", ref: "w1", strength: 2 }).success).toBe(false);
+});
+
+test("alignmentBand rounds to the nearest level and returns null when unrated", () => {
+  expect(alignmentBand(3)?.code).toBe("high");
+  expect(alignmentBand(1.6)?.code).toBe("medium");
+  expect(alignmentBand(0)?.code).toBe("none");
+  expect(alignmentBand(null)).toBeNull();
+  expect(alignmentBand(undefined)).toBeNull();
+});
+
+const SAMPLE_CELLS = [
+  { cloCode: "CLO1", kind: "week", ref: "w1", strength: 3 },
+  { cloCode: "CLO1", kind: "assessment", ref: "a1", strength: 2 },
+  { cloCode: "CLO2", kind: "week", ref: "w1", strength: 1 },
+  { cloCode: "CLO2", kind: "assessment", ref: "a1", strength: 0 },
+] as const;
+
+test("meanStrength averages rated cells and is null when empty", () => {
+  expect(meanStrength(SAMPLE_CELLS)).toBe(1.5);
+  expect(meanStrength([])).toBeNull();
+});
+
+test("mappingOverallPercent is the mean as a share of 3", () => {
+  expect(mappingOverallPercent(SAMPLE_CELLS)).toBe(50); // 1.5 / 3
+  expect(mappingOverallPercent([])).toBe(0);
+});
+
+test("mappingDistribution counts rated cells per band", () => {
+  expect(mappingDistribution(SAMPLE_CELLS)).toEqual({ 0: 1, 1: 1, 2: 1, 3: 1 });
+});
+
+test("cloAlignmentAverages averages per CLO and yields null for unrated CLOs", () => {
+  expect(cloAlignmentAverages(SAMPLE_CELLS, ["CLO1", "CLO2", "CLO3"])).toEqual([
+    { code: "CLO1", average: 2.5 },
+    { code: "CLO2", average: 0.5 },
+    { code: "CLO3", average: null },
+  ]);
+});
+
+test("componentsMapped counts refs with at least one aligned (>=1) cell", () => {
+  expect(componentsMapped(SAMPLE_CELLS, "week", ["w1", "w2"])).toBe(1);
+  // a1 only has strengths 2 and 0 → the 2 counts it as mapped.
+  expect(componentsMapped(SAMPLE_CELLS, "assessment", ["a1", "a2"])).toBe(1);
+});
+
+test("mapping is registered in SPEC_SECTION_SCHEMAS", () => {
+  expect(SPEC_SECTION_SCHEMAS.mapping).toBe(MappingSection);
 });

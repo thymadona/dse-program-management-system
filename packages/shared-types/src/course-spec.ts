@@ -39,6 +39,7 @@ export const SPEC_SECTIONS: readonly SpecSectionMeta[] = [
   { id: "cloMapping", title: "CLO → PLO Mapping & Methods", ref: "§15", part: "Part 2", state: "ready" },
   { id: "slt", title: "Weekly Plan", ref: "§18", part: "Part 2", state: "ready" },
   { id: "assessmentPlan", title: "Course Assessment Plan", ref: "§17", part: "Part 2", state: "ready" },
+  { id: "mapping", title: "CLO Alignment Mapping", ref: "§14–18", part: "Part 2", state: "ready" },
   { id: "resources", title: "Required Resources", ref: "§19", part: "Part 2", state: "soon" },
   { id: "references", title: "References / Textbooks", ref: "§20", part: "Part 2", state: "soon" },
   { id: "responsibility", title: "Student Responsibility", ref: "§21", part: "Part 2", state: "soon" },
@@ -395,6 +396,106 @@ export function assessmentPlanTotalWeight(section: AssessmentPlanSection): numbe
     .reduce((sum, a) => sum + (a.weight ?? 0), 0);
 }
 
+/* --------------------------------------- Alignment Mapping (CLO × components) */
+
+/**
+ * Alignment strengths a lecturer can assign a matrix cell, richest first. Stored as
+ * an integer 0–3 so cells can be averaged: 0 = explicitly "None" (rated, no
+ * meaningful alignment), 1 = Low, 2 = Medium, 3 = High. A cell *absent* from
+ * {@link MappingSection} `cells` is **unrated** — distinct from an explicit None.
+ */
+export const ALIGNMENT_STRENGTHS: readonly {
+  value: 0 | 1 | 2 | 3;
+  code: "none" | "low" | "medium" | "high";
+  name: string;
+  color: string;
+}[] = [
+  { value: 3, code: "high", name: "High", color: "#22c55e" },
+  { value: 2, code: "medium", name: "Medium", color: "#f59e0b" },
+  { value: 1, code: "low", name: "Low", color: "#ef4444" },
+  { value: 0, code: "none", name: "None", color: "#94a3b8" },
+] as const;
+
+/** The component a mapping cell aligns a CLO to: a §18 Weekly Plan week or a §17 assessment. */
+export const MappingComponentKind = z.enum(["week", "assessment"]);
+export type MappingComponentKind = z.infer<typeof MappingComponentKind>;
+
+/**
+ * One matrix cell: the alignment `strength` (0–3) of `cloCode` (a §14 CLO) against
+ * one component — a week or assessment identified by `ref` (that row's stable id).
+ * The grid is sparse; only cells a lecturer has rated are stored.
+ */
+export const MappingCell = z.object({
+  cloCode: z.string().min(1),
+  kind: MappingComponentKind,
+  ref: z.string().min(1),
+  strength: z.coerce.number().int().min(0).max(3),
+});
+export type MappingCell = z.infer<typeof MappingCell>;
+
+export const MappingSection = z.object({
+  cells: z.array(MappingCell).default([]),
+});
+export type MappingSection = z.infer<typeof MappingSection>;
+
+/** Stable key for a cell, used to look one up by CLO + component. */
+export function mappingCellKey(kind: MappingComponentKind, ref: string, cloCode: string): string {
+  return `${kind}:${ref}:${cloCode}`;
+}
+
+/** Band metadata (name/colour) for a strength, rounded to the nearest level; null when unrated. */
+export function alignmentBand(strength: number | null | undefined) {
+  if (strength == null || Number.isNaN(strength)) return null;
+  const rounded = Math.max(0, Math.min(3, Math.round(strength)));
+  return ALIGNMENT_STRENGTHS.find((s) => s.value === rounded) ?? null;
+}
+
+/** Mean strength of the given rated cells (2-dp), or null when none are rated. */
+export function meanStrength(cells: readonly MappingCell[]): number | null {
+  if (cells.length === 0) return null;
+  const sum = cells.reduce((acc, c) => acc + c.strength, 0);
+  return Math.round((sum / cells.length) * 100) / 100;
+}
+
+/** Overall alignment as a percentage of the maximum (3) across all rated cells, rounded. */
+export function mappingOverallPercent(cells: readonly MappingCell[]): number {
+  const mean = meanStrength(cells);
+  return mean == null ? 0 : Math.round((mean / 3) * 100);
+}
+
+/** Count of rated cells in each strength band (0–3). */
+export function mappingDistribution(cells: readonly MappingCell[]): Record<0 | 1 | 2 | 3, number> {
+  const dist: Record<0 | 1 | 2 | 3, number> = { 0: 0, 1: 0, 2: 0, 3: 0 };
+  for (const c of cells) {
+    const v = Math.max(0, Math.min(3, Math.round(c.strength))) as 0 | 1 | 2 | 3;
+    dist[v] += 1;
+  }
+  return dist;
+}
+
+/** Per-CLO average strength over that CLO's rated cells; null when a CLO has none. */
+export function cloAlignmentAverages(
+  cells: readonly MappingCell[],
+  cloCodes: readonly string[],
+): { code: string; average: number | null }[] {
+  return cloCodes.map((code) => ({
+    code,
+    average: meanStrength(cells.filter((c) => c.cloCode === code)),
+  }));
+}
+
+/** How many of `refs` (week or assessment ids) have at least one aligned cell (strength ≥ 1). */
+export function componentsMapped(
+  cells: readonly MappingCell[],
+  kind: MappingComponentKind,
+  refs: readonly string[],
+): number {
+  const aligned = new Set(
+    cells.filter((c) => c.kind === kind && c.strength >= 1).map((c) => c.ref),
+  );
+  return refs.filter((r) => aligned.has(r)).length;
+}
+
 /** Zod schema for a given section id. Extend as later phases add sections. */
 export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> = {
   courseInfo: CourseInfoSection,
@@ -402,6 +503,7 @@ export const SPEC_SECTION_SCHEMAS: Partial<Record<SpecSectionId, z.ZodTypeAny>> 
   cloMapping: CloMappingSection,
   slt: WeeklyPlanSection,
   assessmentPlan: AssessmentPlanSection,
+  mapping: MappingSection,
 };
 
 /* ------------------------------------------------------------- spec envelope */

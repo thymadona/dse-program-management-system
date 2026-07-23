@@ -145,6 +145,17 @@ This is the largest and most active domain, defined entirely in
   and are fixed programme data, not user-editable — except `LEARNING_ACTIVITIES`, which
   is a starting vocabulary for the Weekly Plan's activity picker that lecturers can
   extend with their own entries.
+- The **CLO Alignment Mapping** section (`mapping` key, tab labelled "Mapping") is a
+  cross-reference view, not a numbered RUPP section: a matrix of §14 CLOs against §18
+  Weekly Plan weeks and §17 assessments, each cell storing an editable alignment
+  **strength** (0 None / 1 Low / 2 Medium / 3 High). Storage is sparse — only rated
+  cells live in `data.mapping.cells` (absent = *unrated*, distinct from an explicit
+  None); cells referencing a deleted week/assessment/CLO are reconciled away on load
+  and save. Every headline figure (overall %, per-CLO and per-column averages, the
+  distribution donut) is derived from these cells by pure helpers in
+  `course-spec.ts` (`mappingOverallPercent`, `cloAlignmentAverages`, …). Frontend lives
+  in `mapping-section.tsx` + `mapping-model.ts`. The older §15 tab (CLO→PLO Mapping &
+  Methods, `cloMapping`) still exists, relabelled "CLO → PLO" so both coexist.
 - `TeachingMethod`/`AssessmentMethod` (the `methods` plugin) are global vocabularies
   shared across all courses that grow as lecturers add new methods from the §15 form
   — an add of an existing name reuses the row rather than duplicating it.
