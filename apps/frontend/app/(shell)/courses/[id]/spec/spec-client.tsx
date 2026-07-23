@@ -52,12 +52,12 @@ import {
   type CloMappingForm,
 } from "./clo-mapping-section";
 import {
-  SltSectionForm,
-  EMPTY_SLT,
-  toSltForm,
-  toSltPayload,
-  type SltForm,
-} from "./slt-section";
+  WeeklyPlanSectionForm,
+  EMPTY_WEEKLY_PLAN,
+  toWeeklyPlanForm,
+  toWeeklyPlanPayload,
+  type WeeklyPlanForm,
+} from "./weekly-plan-section";
 import { OverviewTab } from "./overview-tab";
 
 /** Tab bar shown on the spec page — a curated view over `SPEC_SECTIONS`, not a 1:1 mirror of it. */
@@ -83,7 +83,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
   const [clos, setClos] = useState<CloForm[]>(EMPTY_CLOS);
   const [cloMapping, setCloMapping] = useState<CloMappingForm[]>([]);
-  const [slt, setSlt] = useState<SltForm>(EMPTY_SLT);
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlanForm>(EMPTY_WEEKLY_PLAN);
   const [closSavedAt, setClosSavedAt] = useState<Date | null>(null);
   const [courseTotalSlt, setCourseTotalSlt] = useState<number | null>(null);
   const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
@@ -106,7 +106,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
       setCourseInfo(toCourseInfoForm(spec.data.courseInfo as Record<string, unknown> | undefined));
       setClos(toClosForm(spec.data.clos));
       setCloMapping(toCloMappingForm(spec.data.cloMapping));
-      setSlt(toSltForm(spec.data.slt));
+      setWeeklyPlan(toWeeklyPlanForm(spec.data.slt));
       setStatus(spec.status ?? {});
       setTeachingMethods(methods.teaching);
       setAssessmentMethods(methods.assessment);
@@ -161,7 +161,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
             toCloMappingPayload(reconciled, courseTotalSlt),
           );
         } else if (sectionId === "slt") {
-          await courseSpecApi.saveSection(courseId, "slt", toSltPayload(slt));
+          await courseSpecApi.saveSection(courseId, "slt", toWeeklyPlanPayload(weeklyPlan));
         }
         setStatus((s) => ({ ...s, [sectionId]: "complete" }));
         setSavedFlash(true);
@@ -174,7 +174,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
         setSaving(false);
       }
     },
-    [courseId, courseInfo, clos, cloMapping, slt, courseTotalSlt],
+    [courseId, courseInfo, clos, cloMapping, weeklyPlan, courseTotalSlt],
   );
 
   const activeMeta = useMemo(() => sectionMeta(activeTab), [activeTab]);
@@ -231,7 +231,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               courseInfo={courseInfo}
               clos={clos}
               cloMapping={cloMapping}
-              slt={slt}
+              weeklyPlan={weeklyPlan}
               status={status}
               onEditCourseInfo={() => setCourseInfoDialogOpen(true)}
               onGoToTab={(id) => setActiveTab(id)}
@@ -250,7 +250,12 @@ export function SpecClient({ courseId }: { courseId: string }) {
 
           <TabsContent value="slt" className="mt-4">
             <SectionPanel>
-              <SltSectionForm value={slt} onChange={setSlt} clos={clos} />
+              <WeeklyPlanSectionForm
+                value={weeklyPlan}
+                onChange={setWeeklyPlan}
+                clos={clos}
+                courseName={course ? `${course.code} - ${course.title}` : undefined}
+              />
             </SectionPanel>
           </TabsContent>
 
