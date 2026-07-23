@@ -20,20 +20,20 @@
   --card: #ffffff;
   --foreground: #102a30;
 
-  /* Sidebar stays a fixed brand navy in both themes — it does not flip with
-     light/dark mode, so these have no .dark override below. */
-  --sidebar: #102a30;
-  --sidebar-foreground: #e7edf0;
-  --sidebar-muted: #7c8f95;
-  --sidebar-active: #1c3d45;
-  --sidebar-border: #1c3d45;
-  --sidebar-ring: #4f95d1;
+  /* Sidebar follows the canvas/foreground pair so it flips white/black with
+     the theme instead of staying a fixed brand colour; see .dark below. */
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-muted: var(--muted-foreground);
+  --sidebar-active: var(--muted);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 
-  --primary: #102a30;
+  --primary: #2563eb; /* vivid blue — CTA buttons, links, focus */
   --primary-foreground: #ffffff;
 
-  --accent: #cfe0f4; /* light blue */
-  --accent-foreground: #102a30;
+  --accent: #dbeafe; /* light blue tint — chips, badges, hover fills */
+  --accent-foreground: #1e3a8a;
 
   --border: #e2e8f0;
   --muted: #f1f5f9;
@@ -60,7 +60,7 @@
   --secondary: var(--muted);
   --secondary-foreground: var(--foreground);
   --input: var(--border);
-  --ring: var(--accent);
+  --ring: var(--primary);
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   --radius: 0.75rem;
@@ -68,22 +68,23 @@
 
 /**
  * Dark theme — same token names, re-tinted for a dark canvas. Sidebar tokens
- * are intentionally absent here; the sidebar keeps its fixed brand navy.
+ * have no separate override here: they alias --card/--foreground/etc in
+ * :root, which resolve to the values below wherever .dark is applied.
  */
 .dark {
-  --canvas: #0b171c;
-  --card: #12242b;
-  --foreground: #e7edf0;
+  --canvas: #0a0a0a;
+  --card: #18181b;
+  --foreground: #fafafa;
 
-  --primary: #21424a;
+  --primary: #3b82f6; /* vivid blue, brightened for dark backgrounds */
   --primary-foreground: #ffffff;
 
-  --accent: #2f5773;
+  --accent: #1e3a8a;
   --accent-foreground: #eaf2fa;
 
-  --border: #24393f;
-  --muted: #17282e;
-  --muted-foreground: #8a9aa1;
+  --border: #27272a;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
 
   --status-live: #34d399;
   --status-live-bg: rgba(21, 160, 106, 0.16);
