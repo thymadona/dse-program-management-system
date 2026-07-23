@@ -10,7 +10,7 @@ PR here closes one (`Closes #N` in the PR body), and branches follow a `<type>/<
 convention (`feat/supabase-auth`, `docs/claude-md`, `fix/...`). This skill just makes
 that loop explicit and repeatable instead of ad hoc.
 
-The loop has four stages. Don't skip stages, but use judgment on *scope* — a two-line
+The loop has five stages. Don't skip stages, but use judgment on *scope* — a two-line
 typo fix the user dictated directly doesn't need this ceremony; a feature, bug, or
 anything the user describes as a task to pick up does.
 
@@ -133,3 +133,11 @@ board automation, so Status still lands on Done with no extra step:
 ```bash
 gh issue close <N> --comment "<reason>"
 ```
+
+## 5. Review — before merge
+
+Once the PR is open, run `/code-review` against it before treating the work as
+mergeable. Wait for its `gh pr comment` (issues found, or an explicit "no issues
+found") before calling the PR ready. If it finds anything scoring ≥80, address it
+with additional commits on the same branch and re-run the review rather than
+merging past it.
