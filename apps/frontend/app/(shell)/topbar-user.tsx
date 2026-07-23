@@ -1,20 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { MeResponse } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
-import { authApi } from "@/lib/auth";
+import { useMe } from "@/lib/auth";
 import { AUTH_MODE, getSupabase } from "@/lib/supabase";
 
 /** Shows the signed-in user (email + role) and a Sign out action (supabase mode). */
 export function TopbarUser() {
   const router = useRouter();
-  const [me, setMe] = useState<MeResponse | null>(null);
-
-  useEffect(() => {
-    authApi.me().then(setMe).catch(() => setMe(null));
-  }, []);
+  const { me } = useMe();
 
   const signOut = async () => {
     await getSupabase().auth.signOut();
