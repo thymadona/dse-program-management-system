@@ -33,6 +33,7 @@ export function AssessmentSection({
 
   const openAdd = () => router.push(`/courses/${courseId}/spec/assessment/add`);
   const openEdit = (id: string) => router.push(`/courses/${courseId}/spec/assessment/${id}/edit`);
+  const openRubrics = () => router.push(`/courses/${courseId}/spec/assessment/rubrics`);
 
   const duplicate = (index: number) => {
     const src = value[index];
@@ -63,9 +64,14 @@ export function AssessmentSection({
             Define assessments, link to CLOs, set weightings and plan assessment schedule.
           </p>
         </div>
-        <Button size="sm" onClick={openAdd}>
-          <Plus className="mr-1.5 h-4 w-4" /> Add Assessment
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={openRubrics}>
+            <ClipboardList className="mr-1.5 h-4 w-4" /> Rubric Library
+          </Button>
+          <Button size="sm" onClick={openAdd}>
+            <Plus className="mr-1.5 h-4 w-4" /> Add Assessment
+          </Button>
+        </div>
       </div>
 
       {notice ? (

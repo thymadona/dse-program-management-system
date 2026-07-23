@@ -31,11 +31,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@dse-pms/ui";
-import { Topbar } from "../topbar";
+import { Topbar } from "../../../../../topbar";
 import { ApiError } from "@/lib/api";
+import { coursesApi, type CourseView } from "@/lib/courses";
 import { rubricsApi } from "@/lib/rubrics";
-
-const BACK_HREF = "/rubrics";
 
 function newCriterion(levelCount: number): RubricCriterion {
   return {
@@ -45,10 +44,17 @@ function newCriterion(levelCount: number): RubricCriterion {
   };
 }
 
-export function RubricFormPage({ rubricId }: { rubricId: string | null }) {
+export function RubricFormPage({
+  courseId,
+  rubricId,
+}: {
+  courseId: string;
+  rubricId: string | null;
+}) {
   const router = useRouter();
   const editing = rubricId !== null;
 
+  const [course, setCourse] = useState<CourseView | null>(null);
   const [name, setName] = useState("");
   const [type, setType] = useState<RubricType>(RUBRIC_TYPES[0]);
   const [status, setStatus] = useState<RubricStatus>("Draft");
@@ -60,6 +66,13 @@ export function RubricFormPage({ rubricId }: { rubricId: string | null }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
+
+  const backHref = `/courses/${courseId}/spec/assessment/rubrics`;
+  const assessmentHref = `/courses/${courseId}/spec?tab=assessmentPlan`;
+
+  useEffect(() => {
+    coursesApi.get(courseId).then(setCourse).catch(() => setCourse(null));
+  }, [courseId]);
 
   useEffect(() => {
     if (!rubricId) return;
@@ -142,7 +155,7 @@ export function RubricFormPage({ rubricId }: { rubricId: string | null }) {
     try {
       if (rubricId) await rubricsApi.update(rubricId, parsed.data);
       else await rubricsApi.create(parsed.data);
-      router.push(BACK_HREF);
+      router.push(backHref);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to save the rubric");
     } finally {
@@ -150,6 +163,7 @@ export function RubricFormPage({ rubricId }: { rubricId: string | null }) {
     }
   };
 
+  const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
   const pageTitle = editing ? "Edit rubric" : "Create rubric";
 
   return (
@@ -160,7 +174,23 @@ export function RubricFormPage({ rubricId }: { rubricId: string | null }) {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink render={<Link href={BACK_HREF}>Rubric Library</Link>} />
+                <BreadcrumbLink render={<Link href="/courses">Course Management</Link>} />
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{breadcrumbLabel}</BreadcrumbPage>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink render={<Link href={assessmentHref}>Course Specification</Link>} />
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink render={<Link href={assessmentHref}>Assessment</Link>} />
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink render={<Link href={backHref}>Rubric Library</Link>} />
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>
@@ -180,7 +210,7 @@ export function RubricFormPage({ rubricId }: { rubricId: string | null }) {
           ) : notFound ? (
             <p className="text-sm text-muted-foreground">
               That rubric could not be found.{" "}
-              <Link href={BACK_HREF} className="underline">
+              <Link href={backHref} className="underline">
                 Back to Rubric Library
               </Link>
             </p>
@@ -355,7 +385,7 @@ export function RubricFormPage({ rubricId }: { rubricId: string | null }) {
               </section>
 
               <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
-                <Button type="button" variant="outline" render={<Link href={BACK_HREF}>Cancel</Link>} />
+                <Button type="button" variant="outline" render={<Link href={backHref}>Cancel</Link>} />
                 <Button type="submit" disabled={saving}>
                   {saving ? "Saving…" : editing ? "Save changes" : "Create rubric"}
                 </Button>
