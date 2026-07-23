@@ -1,17 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Link from "next/link";
 import { CalendarDays, Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@dse-pms/ui";
-import type { CloForm } from "./clos-section";
-import {
-  cloChip,
-  weekSltForm,
-  weeklyPlanFormTotals,
-  type WeekForm,
-  type WeeklyPlanForm,
-} from "./weekly-plan-model";
-import { AddWeekDialog } from "./add-week-dialog";
+import { cloChip, weekSltForm, weeklyPlanFormTotals, type WeeklyPlanForm } from "./weekly-plan-model";
 
 // Re-exported so the wizard keeps importing the weekly-plan model from this section.
 export {
@@ -24,33 +16,18 @@ export {
 export function WeeklyPlanSectionForm({
   value,
   onChange,
-  clos,
+  courseId,
   courseName,
 }: {
   value: WeeklyPlanForm;
   onChange: (v: WeeklyPlanForm) => void;
-  clos: CloForm[];
+  courseId: string;
   courseName?: string;
 }) {
-  // Dialog state: editing a specific id, adding (null), or closed.
-  const [editing, setEditing] = useState<{ id: string | null } | null>(null);
+  const addWeekHref = `/courses/${courseId}/spec/weekly-plan/add`;
+  const editWeekHref = (weekId: string) => `/courses/${courseId}/spec/weekly-plan/${weekId}/edit`;
 
   const totals = weeklyPlanFormTotals(value);
-  const existingAssessments = useMemo(
-    () => [...new Set(value.map((w) => w.assessment.trim()).filter(Boolean))],
-    [value],
-  );
-  const editingWeek = editing?.id ? value.find((w) => w.id === editing.id) ?? null : null;
-
-  const upsert = (draft: WeekForm) => {
-    const exists = value.some((w) => w.id === draft.id);
-    const next = exists
-      ? value.map((w) => (w.id === draft.id ? draft : w))
-      : [...value, draft];
-    next.sort((a, b) => (Number(a.week) || 0) - (Number(b.week) || 0));
-    onChange(next);
-    setEditing(null);
-  };
 
   const remove = (id: string) => {
     const w = value.find((x) => x.id === id);
@@ -71,9 +48,14 @@ export function WeeklyPlanSectionForm({
             {courseName ? ` for ${courseName}` : ""}.
           </p>
         </div>
-        <Button size="sm" onClick={() => setEditing({ id: null })}>
-          <Plus className="mr-1.5 h-4 w-4" /> Add Week
-        </Button>
+        <Button
+          size="sm"
+          render={
+            <Link href={addWeekHref}>
+              <Plus className="mr-1.5 h-4 w-4" /> Add Week
+            </Link>
+          }
+        />
       </div>
 
       <div className="flex items-center gap-2">
@@ -86,13 +68,12 @@ export function WeeklyPlanSectionForm({
       {value.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border py-12 text-center">
           <p className="text-sm text-muted-foreground">No weeks planned yet.</p>
-          <button
-            type="button"
-            onClick={() => setEditing({ id: null })}
-            className="mt-1 text-sm font-medium text-accent-foreground hover:underline"
+          <Link
+            href={addWeekHref}
+            className="mt-1 inline-block text-sm font-medium text-accent-foreground hover:underline"
           >
             + Add your first week
-          </button>
+          </Link>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border">
@@ -159,9 +140,14 @@ export function WeeklyPlanSectionForm({
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex items-center justify-end gap-1">
-                      <IconButton label={`Edit week ${w.week}`} onClick={() => setEditing({ id: w.id })}>
+                      <Link
+                        href={editWeekHref(w.id)}
+                        aria-label={`Edit week ${w.week}`}
+                        title={`Edit week ${w.week}`}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
                         <Pencil className="h-4 w-4" />
-                      </IconButton>
+                      </Link>
                       <IconButton label={`Delete week ${w.week}`} danger onClick={() => remove(w.id)}>
                         <Trash2 className="h-4 w-4" />
                       </IconButton>
@@ -189,16 +175,6 @@ export function WeeklyPlanSectionForm({
         <Info className="h-3.5 w-3.5 shrink-0" />
         SLT = Contact Hours (Lecture + Tutorial) + Self-Study Hours
       </div>
-
-      <AddWeekDialog
-        open={editing != null}
-        week={editingWeek}
-        weeks={value}
-        clos={clos}
-        existingAssessments={existingAssessments}
-        onCancel={() => setEditing(null)}
-        onSave={upsert}
-      />
     </div>
   );
 }

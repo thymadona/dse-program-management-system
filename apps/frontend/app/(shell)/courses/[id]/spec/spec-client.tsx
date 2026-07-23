@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   SPEC_SECTIONS,
   type Method,
@@ -77,7 +78,20 @@ const TABS: { id: TabId; label: string }[] = [
 const sectionMeta = (id: TabId) => SPEC_SECTIONS.find((s) => s.id === id);
 
 export function SpecClient({ courseId }: { courseId: string }) {
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTabState] = useState<TabId>(() => {
+    const requested = searchParams.get("tab");
+    return TABS.some((t) => t.id === requested) ? (requested as TabId) : "overview";
+  });
+  const setActiveTab = useCallback(
+    (id: TabId) => {
+      setActiveTabState(id);
+      router.replace(id === "overview" ? pathname : `${pathname}?tab=${id}`, { scroll: false });
+    },
+    [pathname, router],
+  );
   const [course, setCourse] = useState<CourseView | null>(null);
   const [status, setStatus] = useState<Record<string, SpecSectionStatus>>({});
   const [courseInfo, setCourseInfo] = useState<CourseInfoForm>(EMPTY_COURSE_INFO);
@@ -181,6 +195,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
   const canSaveActive = activeTab === "cloMapping" || activeTab === "slt";
 
   const breadcrumbLabel = course ? `${course.code} – ${course.title}` : "Course Specification";
+  const activeTabLabel = TABS.find((t) => t.id === activeTab)?.label;
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
@@ -197,6 +212,14 @@ export function SpecClient({ courseId }: { courseId: string }) {
           <BreadcrumbItem>
             <BreadcrumbPage>Course Specification</BreadcrumbPage>
           </BreadcrumbItem>
+          {activeTab !== "overview" && activeTabLabel ? (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{activeTabLabel}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          ) : null}
         </BreadcrumbList>
       </Breadcrumb>
 
@@ -253,7 +276,7 @@ export function SpecClient({ courseId }: { courseId: string }) {
               <WeeklyPlanSectionForm
                 value={weeklyPlan}
                 onChange={setWeeklyPlan}
-                clos={clos}
+                courseId={courseId}
                 courseName={course ? `${course.code} - ${course.title}` : undefined}
               />
             </SectionPanel>
