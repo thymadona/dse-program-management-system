@@ -49,3 +49,12 @@ export interface LecturersServiceContract {
   list(): Promise<LecturerRef[]>;
   getById(id: string): Promise<LecturerRef | null>;
 }
+
+export interface OfferingsServiceContract {
+  /**
+   * Distinct course ids for which the given lecturer teaches at least one
+   * offering. Courses uses this (via the registry) so a lecturer who teaches an
+   * offering of a course can see/open that course, even if they don't own it.
+   */
+  courseIdsForLecturer(lecturerId: string): Promise<string[]>;
+}

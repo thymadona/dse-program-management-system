@@ -140,6 +140,18 @@ export const offeringService = {
     return prisma.offering.delete({ where: { id } });
   },
 
+  // Cross-plugin (OfferingsServiceContract): the distinct courses a lecturer
+  // teaches an offering of. Courses uses this so teaching an offering of a
+  // course grants access to that course, independent of Course.lecturerId.
+  async courseIdsForLecturer(lecturerId: string): Promise<string[]> {
+    const rows = await prisma.offering.findMany({
+      where: { lecturerId },
+      select: { courseId: true },
+      distinct: ["courseId"],
+    });
+    return rows.map((r) => r.courseId);
+  },
+
   async enroll(id: string, input: EnrollInput): Promise<OfferingView> {
     const offering = await prisma.offering.findUnique({ where: { id }, include: withEnrollments });
     if (!offering) throw new ReferenceError("Offering not found");

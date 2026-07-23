@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
-import type { Lecturer, OfferingView, Student } from "@dse-pms/shared-types";
+import type { OfferingView, Student } from "@dse-pms/shared-types";
 import { semesterLabel } from "@dse-pms/shared-types";
 import {
   DataTable,
@@ -10,26 +11,18 @@ import {
   TableToolbar,
   type DataTableColumn,
 } from "@dse-pms/ui";
-import { coursesApi, type CourseView } from "@/lib/courses";
-import { lecturersApi } from "@/lib/lecturers";
 import { offeringsApi, offeringTone } from "@/lib/offerings";
 import { studentsApi } from "@/lib/students";
 import { authApi } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { OfferingForm, type OfferingFormValues } from "./offering-form";
 import { EnrollmentDialog } from "./enrollment-dialog";
 
 export function OfferingsClient() {
+  const router = useRouter();
   const [rows, setRows] = useState<OfferingView[]>([]);
-  const [courses, setCourses] = useState<CourseView[]>([]);
-  const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState<OfferingView | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
   const [manage, setManage] = useState<OfferingView | null>(null);
 
@@ -66,31 +59,10 @@ export function OfferingsClient() {
     load();
   }, [load]);
 
-  // Reference data for the form + enrollment dialog.
+  // Reference data for the enrollment dialog.
   useEffect(() => {
-    coursesApi.list().then(setCourses).catch(() => setCourses([]));
-    lecturersApi.list().then(setLecturers).catch(() => setLecturers([]));
     studentsApi.list({}).then(setStudents).catch(() => setStudents([]));
   }, []);
-
-  const handleSubmit = async (values: OfferingFormValues) => {
-    setSubmitting(true);
-    try {
-      if (editing) {
-        const { courseId: _courseId, ...rest } = values;
-        await offeringsApi.update(editing.id, rest);
-      } else {
-        await offeringsApi.create(values);
-      }
-      setFormOpen(false);
-      setEditing(null);
-      await load();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to save offering");
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const handleDelete = async (offering: OfferingView) => {
     if (!confirm(`Delete ${offering.course?.code} · ${offering.term}?`)) return;
@@ -179,14 +151,7 @@ export function OfferingsClient() {
         onSearchChange={() => {}}
         searchPlaceholder="Offerings"
         addLabel={isAdmin ? "Add Offering" : undefined}
-        onAdd={
-          isAdmin
-            ? () => {
-                setEditing(null);
-                setFormOpen(true);
-              }
-            : undefined
-        }
+        onAdd={isAdmin ? () => router.push("/offerings/new") : undefined}
       />
 
       {error ? (
@@ -208,30 +173,10 @@ export function OfferingsClient() {
             onClick: handleManage,
           },
         ]}
-        onEdit={
-          isAdmin
-            ? (o) => {
-                setEditing(o);
-                setFormOpen(true);
-              }
-            : undefined
-        }
+        onEdit={isAdmin ? (o) => router.push(`/offerings/${o.id}/edit`) : undefined}
         onDelete={isAdmin ? handleDelete : undefined}
         loading={loading}
         emptyMessage="No offerings yet. Add one to link a course, lecturer and students for a term."
-      />
-
-      <OfferingForm
-        open={formOpen}
-        onOpenChange={(o) => {
-          setFormOpen(o);
-          if (!o) setEditing(null);
-        }}
-        editing={editing}
-        courses={courses}
-        lecturers={lecturers}
-        onSubmit={handleSubmit}
-        submitting={submitting}
       />
 
       <EnrollmentDialog

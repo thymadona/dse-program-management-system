@@ -22,7 +22,8 @@ async function ensureCourseAccess(req: Request, res: Response, courseId: string)
     res.status(404).json({ error: "Course not found" });
     return false;
   }
-  if (course.lecturerId !== req.user!.id) {
+  // A lecturer may access a course they own or teach an offering of.
+  if (!(await courseService.lecturerCanAccess(courseId, req.user!.id))) {
     res.status(403).json({ error: "You can only access your own courses" });
     return false;
   }

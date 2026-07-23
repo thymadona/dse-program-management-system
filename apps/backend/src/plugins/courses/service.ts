@@ -4,6 +4,7 @@ import type {
   CreateCourseInput,
   LecturersServiceContract,
   ListCoursesQuery,
+  OfferingsServiceContract,
   SpecSectionId,
   UpdateCourseInput,
 } from "@dse-pms/shared-types";
@@ -24,6 +25,10 @@ function lecturers(): LecturersServiceContract {
   return registry.get<LecturersServiceContract>("lecturers").service;
 }
 
+function offerings(): OfferingsServiceContract {
+  return registry.get<OfferingsServiceContract>("offerings").service;
+}
+
 async function assertLecturerExists(lecturerId: string | null | undefined): Promise<void> {
   if (!lecturerId) return;
   const lecturer = await lecturers().getById(lecturerId);
@@ -38,11 +43,12 @@ async function withLecturer<T extends { lecturerId: string | null }>(course: T) 
 
 export const courseService = {
   /**
-   * List courses. When `ownerLecturerId` is given, results are scoped to courses
-   * assigned to that lecturer — the router passes it for non-admin callers so a
-   * lecturer only ever sees their own courses.
+   * List courses. When `lecturerScope` is given, results are scoped to that
+   * lecturer — the router passes it for non-admin callers. Scope = courses they
+   * own (Course.lecturerId) OR teach an offering of, so teaching an offering of a
+   * course surfaces the course in Course Management too.
    */
-  async list(query: ListCoursesQuery, ownerLecturerId?: string) {
+  async list(query: ListCoursesQuery, lecturerScope?: string) {
     const { search } = query;
     const searchFilter = search
       ? {
@@ -52,14 +58,33 @@ export const courseService = {
           ],
         }
       : {};
+    const scopeFilter = lecturerScope
+      ? {
+          OR: [
+            { lecturerId: lecturerScope },
+            { id: { in: await offerings().courseIdsForLecturer(lecturerScope) } },
+          ],
+        }
+      : {};
     const courses = await prisma.course.findMany({
-      where: {
-        ...searchFilter,
-        ...(ownerLecturerId ? { lecturerId: ownerLecturerId } : {}),
-      },
+      where: { AND: [searchFilter, scopeFilter] },
       orderBy: { code: "asc" },
     });
     return Promise.all(courses.map(withLecturer));
+  },
+
+  /**
+   * May the given lecturer see/edit this course? True when they own it or teach
+   * an offering of it. Backs the router's per-course access guard.
+   */
+  async lecturerCanAccess(courseId: string, lecturerId: string): Promise<boolean> {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { lecturerId: true },
+    });
+    if (!course) return false;
+    if (course.lecturerId === lecturerId) return true;
+    return (await offerings().courseIdsForLecturer(lecturerId)).includes(courseId);
   },
 
   // Part of CoursesServiceContract — used by the offerings plugin via the registry.

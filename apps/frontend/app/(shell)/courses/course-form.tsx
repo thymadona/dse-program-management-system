@@ -54,6 +54,13 @@ const UNASSIGNED = "";
 const NOT_SET = "__not_set__";
 const UNASSIGNED_SENTINEL = "__unassigned__";
 
+// base-ui's <Select.Value> renders the raw value unless the Root gets an `items`
+// map (value -> label); without it the trigger would show the enum/lecturer id.
+const COURSE_TYPE_ITEMS: Record<string, string> = {
+  [NOT_SET]: "— Not set —",
+  ...Object.fromEntries(COURSE_TYPES.map((t) => [t, courseTypeLabel(t)])),
+};
+
 export function CourseForm({
   open,
   onOpenChange,
@@ -97,6 +104,11 @@ export function CourseForm({
       setTotalSltHours(editing?.totalSltHours != null ? String(editing.totalSltHours) : "");
     }
   }, [open, editing, reset]);
+
+  const lecturerItems: Record<string, string> = {
+    [UNASSIGNED_SENTINEL]: "— Unassigned —",
+    ...Object.fromEntries(lecturers.map((l) => [l.id, l.name])),
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -153,6 +165,7 @@ export function CourseForm({
             </Field>
             <Field label="Course type (§11)">
               <Select
+                items={COURSE_TYPE_ITEMS}
                 value={courseType === "" ? NOT_SET : courseType}
                 onValueChange={(v) => setCourseType(v && v !== NOT_SET ? v : "")}
               >
@@ -182,6 +195,7 @@ export function CourseForm({
               name="lecturerId"
               render={({ field }) => (
                 <Select
+                  items={lecturerItems}
                   value={field.value || UNASSIGNED_SENTINEL}
                   onValueChange={(v) => field.onChange(v === UNASSIGNED_SENTINEL ? UNASSIGNED : v)}
                 >
