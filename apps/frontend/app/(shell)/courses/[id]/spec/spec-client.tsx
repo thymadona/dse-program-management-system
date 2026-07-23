@@ -272,14 +272,13 @@ export function SpecClient({ courseId }: { courseId: string }) {
           </TabsContent>
 
           <TabsContent value="slt" className="mt-4">
-            <SectionPanel>
-              <WeeklyPlanSectionForm
-                value={weeklyPlan}
-                onChange={setWeeklyPlan}
-                courseId={courseId}
-                courseName={course ? `${course.code} - ${course.title}` : undefined}
-              />
-            </SectionPanel>
+            <WeeklyPlanSectionForm
+              value={weeklyPlan}
+              onChange={setWeeklyPlan}
+              courseId={courseId}
+              courseName={course ? `${course.code} - ${course.title}` : undefined}
+              cloCodes={clos.map((c) => c.code)}
+            />
           </TabsContent>
 
           <TabsContent value="cloMapping" className="mt-4">

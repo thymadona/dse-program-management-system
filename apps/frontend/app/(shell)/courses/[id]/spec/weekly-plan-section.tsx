@@ -1,9 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Info, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  Clock,
+  FolderKanban,
+  Info,
+  Pencil,
+  Plus,
+  Timer,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@dse-pms/ui";
-import { cloChip, weekSltForm, weeklyPlanFormTotals, type WeeklyPlanForm } from "./weekly-plan-model";
+import {
+  cloChip,
+  cloColor,
+  cloCoverage,
+  weekSltForm,
+  weeklyPlanFormTotals,
+  weeklyPlanSummary,
+  type CloCoverage,
+  type WeeklyPlanForm,
+} from "./weekly-plan-model";
 
 // Re-exported so the wizard keeps importing the weekly-plan model from this section.
 export {
@@ -18,11 +38,14 @@ export function WeeklyPlanSectionForm({
   onChange,
   courseId,
   courseName,
+  cloCodes = [],
 }: {
   value: WeeklyPlanForm;
   onChange: (v: WeeklyPlanForm) => void;
   courseId: string;
   courseName?: string;
+  /** §14 CLO codes (e.g. ["CLO1", "CLO2"]) so coverage counts uncovered CLOs too. */
+  cloCodes?: string[];
 }) {
   const addWeekHref = `/courses/${courseId}/spec/weekly-plan/add`;
   const editWeekHref = (weekId: string) => `/courses/${courseId}/spec/weekly-plan/${weekId}/edit`;
@@ -58,123 +81,297 @@ export function WeeklyPlanSectionForm({
         />
       </div>
 
-      <div className="flex items-center gap-2">
-        <CalendarDays className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold text-foreground">
-          Weekly Plan ({value.length} {value.length === 1 ? "Week" : "Weeks"})
-        </h3>
-      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        {/* Table */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-semibold text-foreground">
+              Weekly Plan ({value.length} {value.length === 1 ? "Week" : "Weeks"})
+            </h3>
+          </div>
 
-      {value.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border py-12 text-center">
-          <p className="text-sm text-muted-foreground">No weeks planned yet.</p>
-          <Link
-            href={addWeekHref}
-            className="mt-1 inline-block text-sm font-medium text-accent-foreground hover:underline"
-          >
-            + Add your first week
-          </Link>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full min-w-[920px] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-                <th className="w-14 px-3 py-2.5">Week</th>
-                <th className="px-3 py-2.5">Topic / Content</th>
-                <th className="px-3 py-2.5">CLOs</th>
-                <th className="px-3 py-2.5">Learning Activities</th>
-                <th className="px-3 py-2.5 text-center">Contact Hours (L+T)</th>
-                <th className="px-3 py-2.5 text-center">Self-Study Hours</th>
-                <th className="px-3 py-2.5 text-center">SLT (Hours)</th>
-                <th className="px-3 py-2.5">Assessment / Deliverables</th>
-                <th className="px-3 py-2.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {value.map((w) => (
-                <tr key={w.id} className="border-b border-border/70 align-top">
-                  <td className="px-3 py-3">
-                    <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-accent px-1.5 text-xs font-semibold text-accent-foreground">
-                      {w.week || "—"}
-                    </span>
-                  </td>
-                  <td className="max-w-[240px] px-3 py-3 font-medium text-foreground">
-                    {w.topic || <span className="text-muted-foreground">Untitled</span>}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {w.cloCodes.length ? (
-                        w.cloCodes.map((code) => (
-                          <span
-                            key={code}
-                            className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium ${cloChip(code)}`}
+          {value.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-border py-12 text-center">
+              <p className="text-sm text-muted-foreground">No weeks planned yet.</p>
+              <Link
+                href={addWeekHref}
+                className="mt-1 inline-block text-sm font-medium text-accent-foreground hover:underline"
+              >
+                + Add your first week
+              </Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <table className="w-full min-w-[920px] text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                    <th className="w-14 px-3 py-2.5">Week</th>
+                    <th className="px-3 py-2.5">Topic / Content</th>
+                    <th className="px-3 py-2.5">CLOs</th>
+                    <th className="px-3 py-2.5">Learning Activities</th>
+                    <th className="px-3 py-2.5 text-center">Contact Hours (L+T)</th>
+                    <th className="px-3 py-2.5 text-center">Self-Study Hours</th>
+                    <th className="px-3 py-2.5 text-center">SLT (Hours)</th>
+                    <th className="px-3 py-2.5">Assessment / Deliverables</th>
+                    <th className="px-3 py-2.5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {value.map((w) => (
+                    <tr key={w.id} className="border-b border-border/70 align-top">
+                      <td className="px-3 py-3">
+                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-accent px-1.5 text-xs font-semibold text-accent-foreground">
+                          {w.week || "—"}
+                        </span>
+                      </td>
+                      <td className="max-w-[240px] px-3 py-3 font-medium text-foreground">
+                        {w.topic || <span className="text-muted-foreground">Untitled</span>}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {w.cloCodes.length ? (
+                            w.cloCodes.map((code) => (
+                              <span
+                                key={code}
+                                className={`inline-flex rounded-md px-1.5 py-0.5 text-xs font-medium ${cloChip(code)}`}
+                              >
+                                {code}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="max-w-[200px] px-3 py-3">
+                        {w.activities.length ? (
+                          <ul className="space-y-0.5">
+                            {w.activities.map((a) => (
+                              <li key={a} className="flex items-center gap-1.5 text-foreground">
+                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                                {a}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center text-foreground">{w.contactHours || "—"}</td>
+                      <td className="px-3 py-3 text-center text-foreground">{w.selfStudyHours || "—"}</td>
+                      <td className="px-3 py-3 text-center font-medium text-foreground">{weekSltForm(w)}</td>
+                      <td className="px-3 py-3 text-foreground">
+                        {w.assessment || <span className="text-muted-foreground">—</span>}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          <Link
+                            href={editWeekHref(w.id)}
+                            aria-label={`Edit week ${w.week}`}
+                            title={`Edit week ${w.week}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                           >
-                            {code}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="max-w-[200px] px-3 py-3">
-                    {w.activities.length ? (
-                      <ul className="space-y-0.5">
-                        {w.activities.map((a) => (
-                          <li key={a} className="flex items-center gap-1.5 text-foreground">
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                            {a}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-center text-foreground">{w.contactHours || "—"}</td>
-                  <td className="px-3 py-3 text-center text-foreground">{w.selfStudyHours || "—"}</td>
-                  <td className="px-3 py-3 text-center font-medium text-foreground">{weekSltForm(w)}</td>
-                  <td className="px-3 py-3 text-foreground">
-                    {w.assessment || <span className="text-muted-foreground">—</span>}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        href={editWeekHref(w.id)}
-                        aria-label={`Edit week ${w.week}`}
-                        title={`Edit week ${w.week}`}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                      <IconButton label={`Delete week ${w.week}`} danger onClick={() => remove(w.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </IconButton>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-border bg-muted/40 text-sm font-semibold text-foreground">
-                <td colSpan={4} className="px-3 py-2.5">
-                  Total ({value.length} {value.length === 1 ? "Week" : "Weeks"})
-                </td>
-                <td className="px-3 py-2.5 text-center">{totals.contactHours}</td>
-                <td className="px-3 py-2.5 text-center">{totals.selfStudyHours}</td>
-                <td className="px-3 py-2.5 text-center">{totals.slt}</td>
-                <td colSpan={2} className="px-3 py-2.5" />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
+                            <Pencil className="h-4 w-4" />
+                          </Link>
+                          <IconButton label={`Delete week ${w.week}`} danger onClick={() => remove(w.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </IconButton>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-border bg-muted/40 text-sm font-semibold text-foreground">
+                    <td colSpan={4} className="px-3 py-2.5">
+                      Total ({value.length} {value.length === 1 ? "Week" : "Weeks"})
+                    </td>
+                    <td className="px-3 py-2.5 text-center">{totals.contactHours}</td>
+                    <td className="px-3 py-2.5 text-center">{totals.selfStudyHours}</td>
+                    <td className="px-3 py-2.5 text-center">{totals.slt}</td>
+                    <td colSpan={2} className="px-3 py-2.5" />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
 
-      <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-        <Info className="h-3.5 w-3.5 shrink-0" />
-        SLT = Contact Hours (Lecture + Tutorial) + Self-Study Hours
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <Info className="h-3.5 w-3.5 shrink-0" />
+            SLT = Contact Hours (Lecture + Tutorial) + Self-Study Hours
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <aside className="space-y-4">
+          <CloCoverageCard plan={value} cloCodes={cloCodes} />
+          <SummaryCard plan={value} />
+        </aside>
       </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------- CLO Coverage */
+
+function CloCoverageCard({ plan, cloCodes }: { plan: WeeklyPlanForm; cloCodes: string[] }) {
+  const coverage = cloCoverage(plan, cloCodes.length ? cloCodes : undefined);
+  const totalClos = coverage.length;
+  const coveredClos = coverage.filter((c) => c.weeks > 0).length;
+  const percent = totalClos ? Math.round((coveredClos / totalClos) * 100) : 0;
+
+  return (
+    <Card>
+      <CardHeader title="CLO Coverage" />
+      {totalClos === 0 ? (
+        <p className="rounded-lg border border-dashed border-border py-6 text-center text-sm text-muted-foreground">
+          Link CLOs to weeks to see coverage.
+        </p>
+      ) : (
+        <>
+          <div className="flex items-center gap-5">
+            <Donut coverage={coverage} percent={percent} />
+            <ul className="flex-1 space-y-1.5 text-sm">
+              {coverage.map((c) => (
+                <li key={c.code} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-foreground">
+                    <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: cloColor(c.code) }} />
+                    {c.code}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {c.weeks} {c.weeks === 1 ? "Week" : "Weeks"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div
+            className={`mt-4 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+              percent === 100
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
+                : "border-border bg-muted/30 text-muted-foreground"
+            }`}
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            {percent === 100
+              ? "All CLOs are covered in the weekly plan."
+              : `${coveredClos} of ${totalClos} CLOs covered — ${totalClos - coveredClos} still unlinked.`}
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
+/** SVG donut sized by each CLO's share of total covered weeks. */
+function Donut({ coverage, percent }: { coverage: CloCoverage[]; percent: number }) {
+  const size = 104;
+  const stroke = 14;
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const totalWeeks = coverage.reduce((sum, x) => sum + x.weeks, 0);
+
+  let offset = 0;
+  const segments =
+    totalWeeks > 0
+      ? coverage
+          .filter((x) => x.weeks > 0)
+          .map((x) => {
+            const len = (x.weeks / totalWeeks) * c;
+            const seg = { code: x.code, len, offset };
+            offset += len;
+            return seg;
+          })
+      : [];
+
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--muted)" strokeWidth={stroke} />
+        {segments.map((s) => (
+          <circle
+            key={s.code}
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={cloColor(s.code)}
+            strokeWidth={stroke}
+            strokeDasharray={`${s.len} ${c - s.len}`}
+            strokeDashoffset={-s.offset}
+          />
+        ))}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-bold text-foreground">{percent}%</span>
+        <span className="text-[11px] text-muted-foreground">Covered</span>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------- Weekly Plan Summary */
+
+function SummaryCard({ plan }: { plan: WeeklyPlanForm }) {
+  const s = weeklyPlanSummary(plan);
+  const projectRange =
+    s.projectWeeks.length === 0
+      ? null
+      : s.projectWeeks.length === 1
+        ? `Week ${s.projectWeeks[0]}`
+        : `Week ${s.projectWeeks[0]}-${s.projectWeeks[s.projectWeeks.length - 1]}`;
+
+  return (
+    <Card>
+      <CardHeader title="Weekly Plan Summary" />
+      <dl className="space-y-2.5 text-sm">
+        <SummaryRow icon={<CalendarDays className="h-4 w-4" />} label="Total Weeks" value={s.totalWeeks} />
+        <SummaryRow icon={<Clock className="h-4 w-4" />} label="Total Contact Hours (L+T)" value={s.contactHours} />
+        <SummaryRow icon={<Timer className="h-4 w-4" />} label="Total Self-Study Hours" value={s.selfStudyHours} />
+        <SummaryRow icon={<Clock className="h-4 w-4" />} label="Total SLT Hours" value={s.slt} />
+        <SummaryRow icon={<ClipboardList className="h-4 w-4" />} label="Assessments" value={s.assessments} />
+        <SummaryRow
+          icon={<FolderKanban className="h-4 w-4" />}
+          label="Project Weeks"
+          value={projectRange ? `${s.projectWeeks.length} (${projectRange})` : 0}
+        />
+      </dl>
+    </Card>
+  );
+}
+
+function SummaryRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="flex items-center gap-2 text-muted-foreground">
+        <span className="text-muted-foreground/80">{icon}</span>
+        {label}
+      </span>
+      <span className="font-semibold text-foreground">{value}</span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------- shared */
+
+function Card({ children }: { children: React.ReactNode }) {
+  return <section className="rounded-xl border border-border bg-card p-5">{children}</section>;
+}
+
+function CardHeader({ title, action }: { title: string; action?: React.ReactNode }) {
+  return (
+    <div className="mb-4 flex items-center justify-between">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      {action}
     </div>
   );
 }

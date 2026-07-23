@@ -95,6 +95,63 @@ export function weeklyPlanFormTotals(form: WeeklyPlanForm) {
   );
 }
 
+/** A CLO's coverage across the plan: how many weeks reference it. */
+export type CloCoverage = { code: string; weeks: number };
+
+/**
+ * Per-CLO week counts for the coverage chart. When `cloCodes` is given (the §14
+ * CLO list) it drives the set so uncovered CLOs still show as 0; otherwise the
+ * codes are derived from the weeks themselves.
+ */
+export function cloCoverage(form: WeeklyPlanForm, cloCodes?: string[]): CloCoverage[] {
+  const counts = new Map<string, number>();
+  for (const code of cloCodes ?? []) counts.set(code, 0);
+  for (const w of form) {
+    for (const code of new Set(w.cloCodes)) {
+      if (cloCodes && !counts.has(code)) continue; // ignore codes not in the CLO list
+      counts.set(code, (counts.get(code) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([code, weeks]) => ({ code, weeks }))
+    .sort((a, b) => (Number(a.code.replace(/\D/g, "")) || 0) - (Number(b.code.replace(/\D/g, "")) || 0));
+}
+
+/** Rolled-up figures for the Weekly Plan Summary panel. */
+export function weeklyPlanSummary(form: WeeklyPlanForm) {
+  const totals = weeklyPlanFormTotals(form);
+  const assessments = form.filter((w) => w.assessment.trim()).length;
+  const isProject = (w: WeekForm) =>
+    /project/i.test(w.topic) ||
+    /project/i.test(w.assessment) ||
+    w.activities.some((a) => /project/i.test(a));
+  const projectWeeks = form
+    .filter(isProject)
+    .map((w) => Number(w.week))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .sort((a, b) => a - b);
+  return {
+    totalWeeks: form.length,
+    contactHours: totals.contactHours,
+    selfStudyHours: totals.selfStudyHours,
+    slt: totals.slt,
+    assessments,
+    projectWeeks,
+  };
+}
+
+/* ---------------------------------------------------------------- CLO chart colours */
+
+/** Solid colour values for a CLO donut/legend, parallel to the chip palette above. */
+const CLO_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#f43f5e", "#ec4899"];
+
+/** CSS colour for a CLO code (e.g. "CLO3"), matching {@link cloChip} by number. */
+export function cloColor(code: string): string {
+  const n = Number(code.replace(/\D/g, ""));
+  if (!n) return "var(--muted-foreground)";
+  return CLO_COLORS[(n - 1) % CLO_COLORS.length]!;
+}
+
 /* ------------------------------------------------------------- CLO badge palette */
 
 /** Chip colours for a CLO badge, cycled by CLO number (CLO1 blue, CLO2 green, …). */
