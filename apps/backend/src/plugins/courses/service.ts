@@ -37,17 +37,26 @@ async function withLecturer<T extends { lecturerId: string | null }>(course: T) 
 }
 
 export const courseService = {
-  async list(query: ListCoursesQuery) {
+  /**
+   * List courses. When `ownerLecturerId` is given, results are scoped to courses
+   * assigned to that lecturer — the router passes it for non-admin callers so a
+   * lecturer only ever sees their own courses.
+   */
+  async list(query: ListCoursesQuery, ownerLecturerId?: string) {
     const { search } = query;
+    const searchFilter = search
+      ? {
+          OR: [
+            { code: { contains: search, mode: "insensitive" as const } },
+            { title: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {};
     const courses = await prisma.course.findMany({
-      where: search
-        ? {
-            OR: [
-              { code: { contains: search, mode: "insensitive" } },
-              { title: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : undefined,
+      where: {
+        ...searchFilter,
+        ...(ownerLecturerId ? { lecturerId: ownerLecturerId } : {}),
+      },
       orderBy: { code: "asc" },
     });
     return Promise.all(courses.map(withLecturer));

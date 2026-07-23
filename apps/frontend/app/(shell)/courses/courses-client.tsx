@@ -168,7 +168,9 @@ export function CoursesClient() {
         }
         onDelete={isAdmin ? handleDelete : undefined}
         loading={loading}
-        emptyMessage="No courses yet. Add your first course."
+        emptyMessage={
+          isAdmin ? "No courses yet. Add your first course." : "No courses are assigned to you yet."
+        }
       />
 
       <CourseForm

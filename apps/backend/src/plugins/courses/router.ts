@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import {
   CreateCourseInput,
   ListCoursesQuery,
@@ -10,6 +10,25 @@ import { requireAuth } from "../../core/auth/middleware.ts";
 import { requirePermission } from "../../core/permissions/index.ts";
 import { courseService, ReferenceError } from "./service.ts";
 
+/**
+ * A lecturer may only see/edit courses they're assigned to; admins may access any.
+ * Returns true when the caller may proceed; otherwise writes the 403/404 response
+ * and returns false. `requireAuth` has already run, so `req.user` is set.
+ */
+async function ensureCourseAccess(req: Request, res: Response, courseId: string): Promise<boolean> {
+  if (req.user!.role === "admin") return true;
+  const course = await courseService.getById(courseId);
+  if (!course) {
+    res.status(404).json({ error: "Course not found" });
+    return false;
+  }
+  if (course.lecturerId !== req.user!.id) {
+    res.status(403).json({ error: "You can only access your own courses" });
+    return false;
+  }
+  return true;
+}
+
 export function createCourseRouter(): Router {
   const router = Router();
   router.use(requireAuth);
@@ -20,10 +39,13 @@ export function createCourseRouter(): Router {
       res.status(400).json({ error: "Invalid query", details: parsed.error.flatten() });
       return;
     }
-    res.json(await courseService.list(parsed.data));
+    // Non-admins only ever see the courses assigned to them.
+    const ownerScope = req.user!.role === "admin" ? undefined : req.user!.id;
+    res.json(await courseService.list(parsed.data, ownerScope));
   });
 
   router.get("/:id", requirePermission("courses:read"), async (req, res) => {
+    if (!(await ensureCourseAccess(req, res, req.params.id!))) return;
     const course = await courseService.getDetailed(req.params.id!);
     if (!course) {
       res.status(404).json({ error: "Course not found" });
@@ -72,6 +94,7 @@ export function createCourseRouter(): Router {
   /* -------------------------------------------------- Course Specification */
 
   router.get("/:id/spec", requirePermission("courses:read"), async (req, res) => {
+    if (!(await ensureCourseAccess(req, res, req.params.id!))) return;
     const spec = await courseService.getSpec(req.params.id!);
     if (!spec) {
       res.status(404).json({ error: "Course not found" });
@@ -83,13 +106,7 @@ export function createCourseRouter(): Router {
   router.put("/:id/spec/:sectionId", requirePermission("courses:write"), async (req, res) => {
     // A lecturer may only fill in the spec for a course they're assigned to;
     // admins can edit any course's spec.
-    if (req.user!.role !== "admin") {
-      const course = await courseService.getById(req.params.id!);
-      if (!course || course.lecturerId !== req.user!.id) {
-        res.status(403).json({ error: "You can only edit the specification for your own courses" });
-        return;
-      }
-    }
+    if (!(await ensureCourseAccess(req, res, req.params.id!))) return;
 
     const sectionId = req.params.sectionId as SpecSectionId;
     const schema = SPEC_SECTION_SCHEMAS[sectionId];
