@@ -10,6 +10,9 @@ export const offeringsApi = {
   list(): Promise<OfferingView[]> {
     return api.get<OfferingView[]>("/api/offerings");
   },
+  get(id: string): Promise<OfferingView> {
+    return api.get<OfferingView>(`/api/offerings/${id}`);
+  },
   create(input: CreateOfferingInput): Promise<OfferingView> {
     return api.post<OfferingView>("/api/offerings", input);
   },
