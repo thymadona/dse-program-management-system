@@ -1,5 +1,6 @@
 import {
   Book,
+  ClipboardList,
   Layers,
   LayoutDashboard,
   Presentation,
@@ -25,6 +26,7 @@ export const iconMap: Record<string, LucideIcon> = {
   layers: Layers,
   presentation: Presentation,
   dashboard: LayoutDashboard,
+  clipboard: ClipboardList,
 };
 
 /** All nav routes, or — when a role is given — only those that role may see. */

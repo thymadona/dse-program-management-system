@@ -99,6 +99,17 @@ export const methodsManifest: PluginManifest = {
   permissions: ["methods:read", "methods:write"],
 };
 
+export const rubricsManifest: PluginManifest = {
+  id: "rubrics",
+  name: "Rubric Library",
+  version: "0.1.0",
+  description: "Reusable assessment rubrics — criteria × rating-scale grids shared across courses.",
+  routes: [
+    { label: "Rubric Library", path: "/rubrics", icon: "clipboard", roles: ["admin", "lecturer"] },
+  ],
+  permissions: ["rubrics:read", "rubrics:write"],
+};
+
 export const authManifest: PluginManifest = {
   id: "auth",
   name: "Auth",
@@ -114,6 +125,7 @@ export const pluginManifests: PluginManifest[] = [
   offeringsManifest,
   lecturersManifest,
   methodsManifest,
+  rubricsManifest,
   authManifest,
 ];
 
