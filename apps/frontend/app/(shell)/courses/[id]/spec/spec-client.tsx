@@ -264,8 +264,8 @@ export function SpecClient({ courseId }: { courseId: string }) {
           <TabsContent value="clos" className="mt-4">
             <ClosSection
               value={clos}
+              courseId={courseId}
               assessmentMethods={assessmentMethods}
-              saving={saving}
               lastSavedAt={closSavedAt}
               onPersist={persistClos}
             />

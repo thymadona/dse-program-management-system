@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Copy, Eye, ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import type { Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
-import { bloomStyle, emptyClo, withCodes, type CloForm } from "./clo-model";
+import { bloomStyle, withCodes, type CloForm } from "./clo-model";
 import { ClosDashboard } from "./clo-dashboard";
-import { CloEditorDialog } from "./clo-editor-dialog";
 
 // Re-exported so the wizard can keep importing the CLO model from this section.
 export { EMPTY_CLOS, toClosForm, toClosPayload, type CloForm } from "./clo-model";
@@ -23,18 +23,19 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 export function ClosSection({
   value,
+  courseId,
   assessmentMethods,
-  saving,
   lastSavedAt,
   onPersist,
 }: {
   value: CloForm[];
+  courseId: string;
   assessmentMethods: Method[];
-  saving: boolean;
   lastSavedAt: Date | null;
   /** Persist the given CLO list (whole §14 section) and sync wizard state. */
   onPersist: (items: CloForm[]) => Promise<boolean>;
 }) {
+  const router = useRouter();
   const clos = withCodes(value);
   const methodName = useMemo(() => {
     const map = new Map(assessmentMethods.map((m) => [m.id, m.name]));
@@ -44,8 +45,6 @@ export function ClosSection({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [notice, setNotice] = useState<string | null>(null);
-  // Dialog state: editing an existing index, adding (null index + open), or closed.
-  const [editing, setEditing] = useState<{ index: number | null } | null>(null);
 
   const visible = clos.filter((c) => {
     if (filter === "active" && c.status !== "active") return false;
@@ -60,17 +59,8 @@ export function ClosSection({
     return true;
   });
 
-  const openAdd = () => setEditing({ index: null });
-  const openEdit = (index: number) => setEditing({ index });
-
-  const handleSave = async (draft: CloForm) => {
-    const next =
-      editing?.index == null
-        ? [...clos, draft]
-        : clos.map((c, i) => (i === editing.index ? draft : c));
-    const ok = await onPersist(withCodes(next));
-    if (ok) setEditing(null);
-  };
+  const openAdd = () => router.push(`/courses/${courseId}/spec/clos/add`);
+  const openEdit = (code: string) => router.push(`/courses/${courseId}/spec/clos/${code}/edit`);
 
   const duplicate = (index: number) => {
     const src = clos[index];
@@ -86,8 +76,6 @@ export function ClosSection({
     }
     onPersist(withCodes(clos.filter((_, i) => i !== index)));
   };
-
-  const editingClo = editing?.index != null ? clos[editing.index] ?? null : null;
 
   return (
     <div className="space-y-4">
@@ -232,7 +220,7 @@ export function ClosSection({
                         </td>
                         <td className="py-3">
                           <div className="flex items-center justify-end gap-1">
-                            <IconButton label={`Edit ${clo.code}`} onClick={() => openEdit(index)}>
+                            <IconButton label={`Edit ${clo.code}`} onClick={() => openEdit(clo.code)}>
                               <Pencil className="h-4 w-4" />
                             </IconButton>
                             <IconButton label={`Duplicate ${clo.code}`} onClick={() => duplicate(index)}>
@@ -258,16 +246,6 @@ export function ClosSection({
           </p>
         ) : null}
       </section>
-
-      <CloEditorDialog
-        open={editing != null}
-        clo={editingClo}
-        index={editing?.index != null ? editing.index + 1 : null}
-        assessmentMethods={assessmentMethods}
-        saving={saving}
-        onCancel={() => setEditing(null)}
-        onSave={handleSave}
-      />
     </div>
   );
 }
