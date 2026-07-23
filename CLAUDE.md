@@ -128,18 +128,23 @@ This is the largest and most active domain, defined entirely in
   this is the only validation gate for section saves, so adding a new section means
   adding its schema here and to `SPEC_SECTION_SCHEMAS`.
 - Sections reference each other by stable code, not id: CLOs (§14) are `CLO1`,
-  `CLO2`… by position; §15 CLO→PLO mapping rows and §16 SLT content-topic rows both
-  carry a `cloCode` pointing back to a §14 CLO. Derived values cascade within a
-  section: in §15 the lecturer enters SLT hours per CLO (validated to sum to the
-  course-level total SLT), and Focus % / F-M-P are computed from each CLO's share of
-  that total (`clo-mapping-section.tsx`). In §16 (`slt-section.tsx`) content rows
-  carry an L/T/P/O breakdown per delivery mode while assessment rows carry per-mode
-  hours plus a manual grade weight; §16 and §15 are independent. When touching one of
-  these sections, check whether a derived-value invariant crosses into a sibling
-  section before assuming the change is local.
+  `CLO2`… by position; §15 CLO→PLO mapping rows and the §18 Weekly Plan's `cloCodes`
+  both point back to a §14 CLO. Derived values cascade within a section: in §15 the
+  lecturer enters SLT hours per CLO (validated to sum to the course-level total SLT),
+  and Focus % / F-M-P are computed from each CLO's share of that total
+  (`clo-mapping-section.tsx`). The **Weekly Plan** (§18, tab labelled "Weekly Plan",
+  stored under the `slt` section key) is a week-by-week outline: one row per week with
+  a topic, linked CLOs, learning activities, Contact Hours (L+T), Self-Study Hours, and
+  Assessment/Deliverables. Weekly SLT is derived (`weekSlt` = Contact + Self-Study) and
+  the footer totals each column. It **replaced** the old §16 mode/activity SLT grid, so
+  the detailed physical/online/independent × L/T/P/O breakdown no longer exists; the
+  Weekly Plan and §15 are independent. Frontend lives in `weekly-plan-section.tsx` +
+  `add-week-dialog.tsx` + `weekly-plan-model.ts`.
 - Reference constants (`PLOS`, `COGNITIVE_LEVELS`/`AFFECTIVE_LEVELS`/`PSYCHOMOTOR_LEVELS`,
-  `FOCUS_LEVELS`, `SLT_ACTIVITIES`, `LETTER_GRADES`) back the dropdowns/inline guides
-  and are fixed programme data, not user-editable.
+  `FOCUS_LEVELS`, `LEARNING_ACTIVITIES`, `LETTER_GRADES`) back the dropdowns/inline guides
+  and are fixed programme data, not user-editable — except `LEARNING_ACTIVITIES`, which
+  is a starting vocabulary for the Weekly Plan's activity picker that lecturers can
+  extend with their own entries.
 - `TeachingMethod`/`AssessmentMethod` (the `methods` plugin) are global vocabularies
   shared across all courses that grow as lecturers add new methods from the §15 form
   — an add of an existing name reuses the row rather than duplicating it.

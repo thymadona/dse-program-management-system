@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CloMappingItem, SltSection, SPEC_SECTION_SCHEMAS, rowTotal, modeHoursTotal, perCloSlt, sltSectionTotals } from "./course-spec.ts";
+import { CloMappingItem, WeeklyPlanSection, SPEC_SECTION_SCHEMAS, weekSlt, weeklyPlanTotals } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
 test("CloMappingItem defaults method id arrays to []", () => {
@@ -23,77 +23,56 @@ test("CreateMethodInput trims name and rejects blank", () => {
   expect(CreateMethodInput.safeParse({ name: "   " }).success).toBe(false);
 });
 
-const emptyCells = {
-  physical: {}, online: {}, independent: {},
-};
-
-test("SltSection defaults each row group to []", () => {
-  const parsed = SltSection.parse({});
-  expect(parsed.content).toEqual([]);
-  expect(parsed.continuous).toEqual([]);
-  expect(parsed.final).toEqual([]);
+test("WeeklyPlanSection defaults weeks to []", () => {
+  const parsed = WeeklyPlanSection.parse({});
+  expect(parsed.weeks).toEqual([]);
 });
 
-test("SltSection coerces string hour cells to ints and fills missing cells", () => {
-  const parsed = SltSection.parse({
-    content: [{ id: "t1", title: "Topic 1", cloCode: "CLO1", cells: { physical: { L: "2" }, online: {}, independent: { P: "2" } } }],
+test("WeeklyPlanSection coerces string hours and defaults array/optional fields", () => {
+  const parsed = WeeklyPlanSection.parse({
+    weeks: [{ id: "w1", week: "1", topic: "Intro", contactHours: "2", selfStudyHours: "3" }],
   });
-  expect(parsed.content[0]!.cells.physical.L).toBe(2);
-  expect(parsed.content[0]!.cells.independent.P).toBe(2);
-  expect(parsed.content[0]!.cloCode).toBe("CLO1");
+  const w = parsed.weeks[0]!;
+  expect(w.week).toBe(1);
+  expect(w.contactHours).toBe(2);
+  expect(w.selfStudyHours).toBe(3);
+  expect(w.cloCodes).toEqual([]);
+  expect(w.activities).toEqual([]);
+  expect(w.assessment).toBe("");
 });
 
-test("SltSection rejects hour cells out of range", () => {
-  const bad = { content: [{ id: "t1", title: "x", cloCode: null, cells: { ...emptyCells, physical: { L: 1001 } } }] };
-  expect(SltSection.safeParse(bad).success).toBe(false);
-});
-
-test("SltAssessmentRow uses per-mode hours (no L/T/P/O) and coerces them", () => {
-  const parsed = SltSection.parse({
-    continuous: [{ id: "a1", title: "Quiz", weight: 20, hours: { physical: "2", independent: "8" } }],
+test("WeeklyPlanRow keeps linked CLOs and activities, hours default to null", () => {
+  const parsed = WeeklyPlanSection.parse({
+    weeks: [{ id: "w1", week: 2, topic: "EDA", cloCodes: ["CLO1"], activities: ["Lecture", "Lab Exercise"] }],
   });
-  expect(parsed.continuous[0]!.hours.physical).toBe(2);
-  expect(parsed.continuous[0]!.hours.independent).toBe(8);
-  expect(modeHoursTotal(parsed.continuous[0]!.hours)).toBe(10);
+  const w = parsed.weeks[0]!;
+  expect(w.cloCodes).toEqual(["CLO1"]);
+  expect(w.activities).toEqual(["Lecture", "Lab Exercise"]);
+  expect(w.contactHours).toBeNull();
+  expect(w.selfStudyHours).toBeNull();
 });
 
-test("SltAssessmentRow weight is optional and bounded 0-100", () => {
-  const ok = SltSection.parse({ final: [{ id: "a1", title: "Report", weight: 40, hours: {} }] });
-  expect(ok.final[0]!.weight).toBe(40);
-  const bad = { final: [{ id: "a1", title: "Report", weight: 101, hours: {} }] };
-  expect(SltSection.safeParse(bad).success).toBe(false);
+test("WeeklyPlanSection rejects hours out of range and non-positive weeks", () => {
+  expect(WeeklyPlanSection.safeParse({ weeks: [{ id: "w1", week: 1, contactHours: 201 }] }).success).toBe(false);
+  expect(WeeklyPlanSection.safeParse({ weeks: [{ id: "w1", week: 0 }] }).success).toBe(false);
 });
 
-test("slt is registered in SPEC_SECTION_SCHEMAS", () => {
-  expect(SPEC_SECTION_SCHEMAS.slt).toBe(SltSection);
+test("weekSlt sums contact + self-study, treating nulls as 0", () => {
+  expect(weekSlt({ contactHours: 2, selfStudyHours: 3 })).toBe(5);
+  expect(weekSlt({ contactHours: 2, selfStudyHours: null })).toBe(2);
+  expect(weekSlt({})).toBe(0);
 });
 
-const cells = (o: Record<string, Record<string, number>>) =>
-  SltSection.parse({ content: [{ id: "x", title: "x", cloCode: null, cells: o }] }).content[0]!.cells;
-
-test("rowTotal sums every cell across modes and activities", () => {
-  expect(rowTotal(cells({ physical: { L: 2, P: 2 }, online: { L: 1 }, independent: { O: 3 } }))).toBe(8);
-});
-
-test("perCloSlt groups content hours by cloCode and ignores rows without a CLO", () => {
-  const section = SltSection.parse({
-    content: [
-      { id: "1", title: "A", cloCode: "CLO1", cells: { physical: { L: 4 } } },
-      { id: "2", title: "B", cloCode: "CLO1", cells: { physical: { L: 2 } } },
-      { id: "3", title: "C", cloCode: "CLO2", cells: { physical: { L: 6 } } },
-      { id: "4", title: "D", cloCode: null, cells: { physical: { L: 9 } } },
+test("weeklyPlanTotals sums contact, self-study, and derived SLT over all weeks", () => {
+  const section = WeeklyPlanSection.parse({
+    weeks: [
+      { id: "1", week: 1, contactHours: 2, selfStudyHours: 3 },
+      { id: "2", week: 2, contactHours: 2, selfStudyHours: 6 },
     ],
   });
-  expect(perCloSlt(section.content)).toEqual({ CLO1: 6, CLO2: 6 });
+  expect(weeklyPlanTotals(section)).toEqual({ contactHours: 4, selfStudyHours: 9, slt: 13 });
 });
 
-test("sltSectionTotals cascades content, continuous, final into grand total", () => {
-  const section = SltSection.parse({
-    content: [{ id: "1", title: "A", cloCode: "CLO1", cells: { physical: { L: 10 } } }],
-    continuous: [{ id: "c1", title: "Quiz", weight: 20, hours: { independent: 4 } }],
-    final: [{ id: "f1", title: "Report", weight: 40, hours: { independent: 6 } }],
-  });
-  expect(sltSectionTotals(section)).toEqual({
-    contentTotal: 10, continuousTotal: 4, finalTotal: 6, assessmentTotal: 10, grandTotal: 20,
-  });
+test("slt is registered in SPEC_SECTION_SCHEMAS as the weekly plan", () => {
+  expect(SPEC_SECTION_SCHEMAS.slt).toBe(WeeklyPlanSection);
 });

@@ -15,23 +15,15 @@ import { Button, CompletionRing } from "@dse-pms/ui";
 import type { CourseInfoForm } from "./course-info-section";
 import type { CloForm } from "./clos-section";
 import type { CloMappingForm } from "./clo-mapping-section";
-import type { SltForm } from "./slt-section";
+import type { WeeklyPlanForm } from "./weekly-plan-section";
+import { weekSltForm, weeklyPlanFormTotals } from "./weekly-plan-model";
 import { ProgrammeSection } from "./programme-section";
-
-const MODES = ["physical", "online", "independent"] as const;
-const ACTS = ["L", "T", "P", "O"] as const;
-
-function topicTotal(row: SltForm["content"][number]): number {
-  let n = 0;
-  for (const mode of MODES) for (const act of ACTS) n += Number(row.cells[mode][act] || 0);
-  return n;
-}
 
 export function OverviewTab({
   courseInfo,
   clos,
   cloMapping,
-  slt,
+  weeklyPlan,
   status,
   onEditCourseInfo,
   onGoToTab,
@@ -39,7 +31,7 @@ export function OverviewTab({
   courseInfo: CourseInfoForm;
   clos: CloForm[];
   cloMapping: CloMappingForm[];
-  slt: SltForm;
+  weeklyPlan: WeeklyPlanForm;
   status: Record<string, SpecSectionStatus>;
   onEditCourseInfo: () => void;
   onGoToTab: (id: SpecSectionId) => void;
@@ -50,8 +42,8 @@ export function OverviewTab({
   const missing = fillable.length - completed - inProgress;
   const percent = fillable.length ? Math.round((completed / fillable.length) * 100) : 0;
 
-  const assessmentRows = [...slt.continuous, ...slt.final];
-  const assessmentWeightTotal = assessmentRows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+  const deliverables = weeklyPlan.filter((w) => w.assessment.trim());
+  const planTotals = weeklyPlanFormTotals(weeklyPlan);
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -122,10 +114,10 @@ export function OverviewTab({
           )}
         </Card>
 
-        {/* Course Content & SLT */}
+        {/* Weekly Plan */}
         <Card>
           <CardHeader
-            title="Course Content & Student Learning Time"
+            title="Weekly Plan"
             action={
               <button
                 type="button"
@@ -136,36 +128,48 @@ export function OverviewTab({
               </button>
             }
           />
-          {slt.content.length === 0 ? (
-            <EmptyHint text="No content topics yet." action="Go to Weekly Plan" onClick={() => onGoToTab("slt")} />
+          {weeklyPlan.length === 0 ? (
+            <EmptyHint text="No weeks planned yet." action="Go to Weekly Plan" onClick={() => onGoToTab("slt")} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground">
+                    <th className="py-1.5 pr-2 font-medium">Week</th>
                     <th className="py-1.5 pr-2 font-medium">Topic</th>
-                    <th className="py-1.5 pr-2 font-medium">CLO</th>
-                    <th className="py-1.5 text-right font-medium">SLT Hours</th>
+                    <th className="py-1.5 pr-2 font-medium">CLOs</th>
+                    <th className="py-1.5 text-right font-medium">SLT</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {slt.content.slice(0, 6).map((row) => (
-                    <tr key={row.id} className="border-t border-border">
-                      <td className="py-1.5 pr-2 text-foreground">{row.title || "Untitled topic"}</td>
-                      <td className="py-1.5 pr-2 text-muted-foreground">{row.cloCode || "—"}</td>
-                      <td className="py-1.5 text-right text-foreground">{topicTotal(row)}</td>
+                  {weeklyPlan.slice(0, 6).map((w) => (
+                    <tr key={w.id} className="border-t border-border">
+                      <td className="py-1.5 pr-2 text-muted-foreground">{w.week || "—"}</td>
+                      <td className="py-1.5 pr-2 text-foreground">{w.topic || "Untitled"}</td>
+                      <td className="py-1.5 pr-2 text-muted-foreground">
+                        {w.cloCodes.length ? w.cloCodes.join(", ") : "—"}
+                      </td>
+                      <td className="py-1.5 text-right text-foreground">{weekSltForm(w)}</td>
                     </tr>
                   ))}
                 </tbody>
+                <tfoot>
+                  <tr className="border-t border-border text-xs font-medium text-muted-foreground">
+                    <td className="py-1.5 pr-2" colSpan={3}>
+                      Total SLT ({weeklyPlan.length} {weeklyPlan.length === 1 ? "week" : "weeks"})
+                    </td>
+                    <td className="py-1.5 text-right">{planTotals.slt} h</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
         </Card>
 
-        {/* Assessment Summary */}
+        {/* Deliverables */}
         <Card>
           <CardHeader
-            title="Assessment Summary"
+            title="Deliverables"
             action={
               <button
                 type="button"
@@ -176,20 +180,16 @@ export function OverviewTab({
               </button>
             }
           />
-          {assessmentRows.length === 0 ? (
-            <EmptyHint text="No assessments yet." action="Go to Weekly Plan" onClick={() => onGoToTab("slt")} />
+          {deliverables.length === 0 ? (
+            <EmptyHint text="No deliverables yet." action="Go to Weekly Plan" onClick={() => onGoToTab("slt")} />
           ) : (
             <div className="space-y-1.5 text-sm">
-              {assessmentRows.slice(0, 6).map((row) => (
-                <div key={row.id} className="flex items-center justify-between">
-                  <span className="text-foreground">{row.title || "Untitled assessment"}</span>
-                  <span className="text-muted-foreground">{row.weight || 0}%</span>
+              {deliverables.slice(0, 6).map((w) => (
+                <div key={w.id} className="flex items-center justify-between">
+                  <span className="text-foreground">{w.assessment}</span>
+                  <span className="text-muted-foreground">Week {w.week}</span>
                 </div>
               ))}
-              <div className="flex items-center justify-between border-t border-border pt-1.5 text-xs font-medium text-muted-foreground">
-                <span>Total</span>
-                <span>{assessmentWeightTotal}%</span>
-              </div>
             </div>
           )}
         </Card>
