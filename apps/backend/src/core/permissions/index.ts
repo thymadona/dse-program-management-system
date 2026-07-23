@@ -26,7 +26,7 @@ const ROLE_PERMISSIONS: Record<Role, string[]> = {
   ],
   // Lecturers get exactly what their job needs: read the catalog, fill in the
   // specification of the courses/offerings they're assigned to, and grow the
-  // methods vocabulary from the §15 form. They do NOT get "*:manage" (creating,
+  // methods vocabulary from the CLO (§14) form. They do NOT get "*:manage" (creating,
   // deleting, or reassigning courses/offerings — a curriculum-admin action) or
   // "lecturers:write" (editing other lecturers' profiles) or "accounts:create".
   // Ownership of the specific course/offering is enforced in the route handlers,

@@ -1,7 +1,7 @@
 import type { Method, MethodKind, MethodsResponse } from "@dse-pms/shared-types";
 import { api } from "./api";
 
-/** Client for the §15 method vocabulary endpoints (methods plugin). */
+/** Client for the shared teaching/assessment method vocabulary endpoints (methods plugin). */
 export const methodsApi = {
   list(): Promise<MethodsResponse> {
     return api.get<MethodsResponse>("/api/methods");

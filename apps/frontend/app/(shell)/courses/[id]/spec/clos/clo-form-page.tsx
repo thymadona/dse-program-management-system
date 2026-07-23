@@ -25,6 +25,7 @@ export function CloFormPage({ courseId, cloCode }: { courseId: string; cloCode: 
   const router = useRouter();
   const [course, setCourse] = useState<CourseView | null>(null);
   const [clos, setClos] = useState<CloForm[]>([]);
+  const [teachingMethods, setTeachingMethods] = useState<Method[]>([]);
   const [assessmentMethods, setAssessmentMethods] = useState<Method[]>([]);
   const [draft, setDraft] = useState<CloForm | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,8 +46,9 @@ export function CloFormPage({ courseId, cloCode }: { courseId: string; cloCode: 
           coursesApi.get(courseId),
         ]);
         if (cancelled) return;
-        const closForm = toClosForm(spec.data.clos);
+        const closForm = toClosForm(spec.data.clos, spec.data.cloMapping);
         setClos(closForm);
+        setTeachingMethods(methods.teaching);
         setAssessmentMethods(methods.assessment);
         setCourse(courseView);
         if (cloCode) {
@@ -151,7 +153,9 @@ export function CloFormPage({ courseId, cloCode }: { courseId: string; cloCode: 
                 code={cloCode}
                 set={set}
                 toggle={toggle}
+                teachingMethods={teachingMethods}
                 assessmentMethods={assessmentMethods}
+                courseTotalSlt={course?.totalSltHours ?? null}
                 touched={touched}
               />
 

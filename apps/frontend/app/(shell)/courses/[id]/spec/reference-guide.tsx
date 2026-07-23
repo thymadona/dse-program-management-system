@@ -5,7 +5,7 @@ import { useState } from "react";
 /**
  * Collapsible reference callout — renders a small guide table (e.g. the Bloom
  * Cognitive/Affective/Psychomotor level lists) beside the fields that use them.
- * Wired in Phase 1, reused by later phases (§14/§15 CLO levels, §16 SLT legend…).
+ * Wired in Phase 1, reused by later phases (§14 CLO levels/focus, §16 SLT legend…).
  */
 export function ReferenceGuide({
   title,

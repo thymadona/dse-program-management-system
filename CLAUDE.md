@@ -128,18 +128,26 @@ This is the largest and most active domain, defined entirely in
   this is the only validation gate for section saves, so adding a new section means
   adding its schema here and to `SPEC_SECTION_SCHEMAS`.
 - Sections reference each other by stable code, not id: CLOs (§14) are `CLO1`,
-  `CLO2`… by position; §15 CLO→PLO mapping rows and the §18 Weekly Plan's `cloCodes`
-  both point back to a §14 CLO. Derived values cascade within a section: in §15 the
-  lecturer enters SLT hours per CLO (validated to sum to the course-level total SLT),
-  and Focus % / F-M-P are computed from each CLO's share of that total
-  (`clo-mapping-section.tsx`). The **Weekly Plan** (§18, tab labelled "Weekly Plan",
-  stored under the `slt` section key) is a week-by-week outline: one row per week with
-  a topic, linked CLOs, learning activities, Contact Hours (L+T), Self-Study Hours, and
+  `CLO2`… by position; the §18 Weekly Plan's `cloCodes` point back to a §14 CLO. §14
+  originally split PLO mapping from a separate §15 "CLO → PLO Mapping & Methods" tab
+  (SLT hours, teaching/assessment methods); those were merged into one per-CLO form —
+  the CLO create/edit page (`clos/clo-form-fields.tsx`) now also captures SLT hours,
+  teaching methods, and assessment methods, and §15 no longer exists as a tab. SLT
+  hours entered per CLO must sum to the course-level total SLT (reconciliation banner
+  in `clos-section.tsx`); Focus % / F-M-P are derived from each CLO's share of that
+  total (`cloFocusPercent`/`cloFocusCode` in `course-spec.ts`, wrapped for form string
+  input by `focusPercentOf`/`focusCodeOf` in `clo-model.ts`) — not stored. Course specs
+  saved before this merge carry their SLT hours/teaching methods in a dead `cloMapping`
+  JSON blob; `toClosForm` folds that into the CLO on load if the CLO doesn't already
+  have its own values, so nothing is lost, and the field is dropped for good next time
+  §14 is saved. The **Weekly Plan** (§18, tab labelled "Weekly Plan", stored under the
+  `slt` section key) is a week-by-week outline: one row per week with a topic, linked
+  CLOs, learning activities, Contact Hours (L+T), Self-Study Hours, and
   Assessment/Deliverables. Weekly SLT is derived (`weekSlt` = Contact + Self-Study) and
   the footer totals each column. It **replaced** the old §16 mode/activity SLT grid, so
   the detailed physical/online/independent × L/T/P/O breakdown no longer exists; the
-  Weekly Plan and §15 are independent. Frontend lives in `weekly-plan-section.tsx` +
-  `add-week-dialog.tsx` + `weekly-plan-model.ts`.
+  Weekly Plan and §14's SLT/methods fields are independent. Frontend lives in
+  `weekly-plan-section.tsx` + `add-week-dialog.tsx` + `weekly-plan-model.ts`.
 - Reference constants (`PLOS`, `COGNITIVE_LEVELS`/`AFFECTIVE_LEVELS`/`PSYCHOMOTOR_LEVELS`,
   `FOCUS_LEVELS`, `LEARNING_ACTIVITIES`, `LETTER_GRADES`) back the dropdowns/inline guides
   and are fixed programme data, not user-editable — except `LEARNING_ACTIVITIES`, which
@@ -154,11 +162,10 @@ This is the largest and most active domain, defined entirely in
   and save. Every headline figure (overall %, per-CLO and per-column averages, the
   distribution donut) is derived from these cells by pure helpers in
   `course-spec.ts` (`mappingOverallPercent`, `cloAlignmentAverages`, …). Frontend lives
-  in `mapping-section.tsx` + `mapping-model.ts`. The older §15 tab (CLO→PLO Mapping &
-  Methods, `cloMapping`) still exists, relabelled "CLO → PLO" so both coexist.
+  in `mapping-section.tsx` + `mapping-model.ts`.
 - `TeachingMethod`/`AssessmentMethod` (the `methods` plugin) are global vocabularies
-  shared across all courses that grow as lecturers add new methods from the §15 form
-  — an add of an existing name reuses the row rather than duplicating it.
+  shared across all courses — an add of an existing name reuses the row rather than
+  duplicating it.
 
 ### Frontend
 

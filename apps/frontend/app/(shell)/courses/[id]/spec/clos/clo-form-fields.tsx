@@ -3,23 +3,28 @@
 import {
   AFFECTIVE_LEVELS,
   COGNITIVE_LEVELS,
+  FOCUS_LEVELS,
   PLOS,
   PSYCHOMOTOR_LEVELS,
   type Method,
 } from "@dse-pms/shared-types";
 import { Switch } from "@dse-pms/ui";
-import type { CloForm } from "../clo-model";
+import { focusCodeOf, focusPercentOf, type CloForm } from "../clo-model";
+import { MethodChecklist } from "../method-checklist";
+import { ReferenceGuide } from "../reference-guide";
 
 const STATEMENT_MAX = 300;
 const NOTES_MAX = 300;
 
-/** The four §14 form sections, shared by the full-page Add CLO and Edit CLO routes. */
+/** The form sections, shared by the full-page Add CLO and Edit CLO routes. */
 export function CloFormFields({
   draft,
   code,
   set,
   toggle,
+  teachingMethods,
   assessmentMethods,
+  courseTotalSlt,
   touched,
 }: {
   draft: CloForm;
@@ -27,9 +32,15 @@ export function CloFormFields({
   code: string | null;
   set: (patch: Partial<CloForm>) => void;
   toggle: (key: "mappedPlos" | "assessmentMethodIds", id: string) => void;
+  teachingMethods: Method[];
   assessmentMethods: Method[];
+  /** Course's total SLT hours, used to derive this CLO's Focus (F/M/P) from its share. */
+  courseTotalSlt: number | null;
   touched: boolean;
 }) {
+  const focusPercent = focusPercentOf(draft.sltHours, courseTotalSlt);
+  const focusCode = focusCodeOf(focusPercent);
+  const focusName = FOCUS_LEVELS.find((f) => f.code === focusCode)?.name;
   const statementError = touched && draft.description.trim().length === 0;
 
   return (
@@ -140,11 +151,62 @@ export function CloFormFields({
         </div>
 
         <div className="space-y-3">
-          <SectionTitle n={3} title="Assessment Methods" />
+          <SectionTitle n={3} title="Student Learning Time" />
+          <p className="text-xs text-muted-foreground">
+            Hours of Student Learning Time this CLO accounts for. Across all CLOs these must add up
+            to the course&apos;s total SLT; Focus and its F/M/P category are derived automatically
+            from this CLO&apos;s share of that total.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Field label="SLT hours">
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 42"
+                className="h-9 w-full rounded-lg border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                value={draft.sltHours}
+                onChange={(e) => set({ sltHours: e.target.value })}
+              />
+            </Field>
+            <div className="block space-y-1.5">
+              <span className="text-sm font-medium text-foreground">Focus (auto)</span>
+              <div
+                className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
+                title="Derived from this CLO's share of the course's total SLT"
+              >
+                {focusCode ? `${focusCode} — ${focusName}` : "—"}
+              </div>
+            </div>
+            <div className="block space-y-1.5">
+              <span className="text-sm font-medium text-foreground">Focus % (auto)</span>
+              <div
+                className="flex h-9 w-full items-center rounded-lg border border-border bg-muted px-3 text-sm text-muted-foreground"
+                title="This CLO's SLT hours ÷ the course's total SLT"
+              >
+                {focusPercent == null ? "—" : `${focusPercent}%`}
+              </div>
+            </div>
+          </div>
+          <ReferenceGuide title="Focus on PLO (F / M / P)" rows={[...FOCUS_LEVELS]} />
+        </div>
+
+        <div className="space-y-3">
+          <SectionTitle n={4} title="Teaching Methods" />
+          <p className="text-xs text-muted-foreground">Select the teaching methods used to deliver this CLO.</p>
+          <MethodChecklist
+            label="Teaching method"
+            options={teachingMethods}
+            selectedIds={draft.teachingMethodIds}
+            onChange={(ids) => set({ teachingMethodIds: ids })}
+          />
+        </div>
+
+        <div className="space-y-3">
+          <SectionTitle n={5} title="Assessment Methods" />
           <p className="text-xs text-muted-foreground">Select the assessment methods that measure this CLO.</p>
           {assessmentMethods.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border p-3 text-xs text-muted-foreground">
-              No assessment methods defined yet. Add them from the Mapping tab.
+              No assessment methods defined yet.
             </p>
           ) : (
             <ul className="grid grid-cols-1 gap-1.5 rounded-lg border border-border p-3 sm:grid-cols-2">
@@ -166,7 +228,7 @@ export function CloFormFields({
         </div>
 
         <Field label="">
-          <SectionTitle n={4} title="Notes" optional />
+          <SectionTitle n={6} title="Notes" optional />
           <textarea
             value={draft.notes}
             maxLength={NOTES_MAX}

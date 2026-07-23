@@ -38,7 +38,7 @@ export const CourseSchema = z.object({
   prerequisites: z.string().nullable().optional(),
   courseType: CourseTypeSchema.nullable().optional(),
   // Admin-entered total SLT (hours) for the course. Independent of §16 — always a
-  // direct input, never derived. Used as the §15 Focus % denominator.
+  // direct input, never derived. Used as the §14 CLO Focus % denominator.
   totalSltHours: z.number().int().nullable().optional(),
   createdAt: z.string().datetime(),
 });

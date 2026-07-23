@@ -2,7 +2,9 @@ import { expect, test } from "bun:test";
 import {
   AssessmentPlanSection,
   assessmentPlanTotalWeight,
-  CloMappingItem,
+  CloItem,
+  cloFocusCode,
+  cloFocusPercent,
   WeeklyPlanSection,
   SPEC_SECTION_SCHEMAS,
   weekSlt,
@@ -18,20 +20,33 @@ import {
 } from "./course-spec.ts";
 import { CreateMethodInput } from "./methods.ts";
 
-test("CloMappingItem defaults method id arrays to []", () => {
-  const parsed = CloMappingItem.parse({ cloCode: "CLO1" });
+test("CloItem defaults method id arrays to []", () => {
+  const parsed = CloItem.parse({ code: "CLO1", description: "Do the thing" });
   expect(parsed.teachingMethodIds).toEqual([]);
   expect(parsed.assessmentMethodIds).toEqual([]);
 });
 
-test("CloMappingItem preserves provided method ids", () => {
-  const parsed = CloMappingItem.parse({
-    cloCode: "CLO1",
+test("CloItem preserves provided SLT hours and method ids", () => {
+  const parsed = CloItem.parse({
+    code: "CLO1",
+    description: "Do the thing",
+    sltHours: 42,
     teachingMethodIds: ["a", "b"],
     assessmentMethodIds: ["c"],
   });
+  expect(parsed.sltHours).toBe(42);
   expect(parsed.teachingMethodIds).toEqual(["a", "b"]);
   expect(parsed.assessmentMethodIds).toEqual(["c"]);
+});
+
+test("cloFocusPercent is a CLO's share of total SLT; cloFocusCode buckets it F/M/P", () => {
+  expect(cloFocusPercent(60, 100)).toBe(60);
+  expect(cloFocusPercent(null, 100)).toBeNull();
+  expect(cloFocusPercent(10, null)).toBeNull();
+  expect(cloFocusCode(60)).toBe("F");
+  expect(cloFocusCode(40)).toBe("M");
+  expect(cloFocusCode(20)).toBe("P");
+  expect(cloFocusCode(null)).toBeNull();
 });
 
 test("CreateMethodInput trims name and rejects blank", () => {

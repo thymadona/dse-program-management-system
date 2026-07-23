@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Copy, Eye, ListFilter, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import type { Method } from "@dse-pms/shared-types";
 import { Button } from "@dse-pms/ui";
-import { bloomStyle, withCodes, type CloForm } from "./clo-model";
+import { bloomStyle, focusCodeOf, focusPercentOf, withCodes, type CloForm } from "./clo-model";
 import { ClosDashboard } from "./clo-dashboard";
 
 // Re-exported so the wizard can keep importing the CLO model from this section.
@@ -25,12 +25,15 @@ export function ClosSection({
   value,
   courseId,
   assessmentMethods,
+  courseTotalSlt,
   lastSavedAt,
   onPersist,
 }: {
   value: CloForm[];
   courseId: string;
   assessmentMethods: Method[];
+  /** Course's total SLT hours — CLO SLT hours must sum to this. */
+  courseTotalSlt: number | null;
   lastSavedAt: Date | null;
   /** Persist the given CLO list (whole §14 section) and sync wizard state. */
   onPersist: (items: CloForm[]) => Promise<boolean>;
@@ -41,6 +44,9 @@ export function ClosSection({
     const map = new Map(assessmentMethods.map((m) => [m.id, m.name]));
     return (id: string) => map.get(id) ?? id;
   }, [assessmentMethods]);
+
+  const assignedSlt = clos.reduce((s, c) => s + (Number(c.sltHours) || 0), 0);
+  const sltMismatch = courseTotalSlt != null && clos.length > 0 && assignedSlt !== courseTotalSlt;
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -115,6 +121,31 @@ export function ClosSection({
         </div>
       ) : null}
 
+      {clos.length > 0 ? (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Total SLT (course)</span>
+            {courseTotalSlt != null ? (
+              <span className="font-semibold text-foreground">{courseTotalSlt} h</span>
+            ) : (
+              <span className="text-muted-foreground">— set it on the course</span>
+            )}
+          </div>
+          <div className="flex items-center justify-between px-3 text-sm">
+            <span className="text-muted-foreground">Assigned across CLOs</span>
+            <span className={sltMismatch ? "font-semibold text-amber-600" : "font-medium text-foreground"}>
+              {assignedSlt} h
+            </span>
+          </div>
+          {sltMismatch ? (
+            <p className="px-3 text-xs text-amber-600">
+              ⚠ CLO SLT hours add up to {assignedSlt} h but the course total SLT is {courseTotalSlt} h — they
+              must match.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <ClosDashboard clos={clos} />
 
       {/* Table */}
@@ -161,7 +192,7 @@ export function ClosSection({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[880px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
                   <th className="w-8 py-2 pr-2">#</th>
@@ -169,6 +200,7 @@ export function ClosSection({
                   <th className="py-2 pr-3">Course Learning Outcome</th>
                   <th className="py-2 pr-3">Bloom's Level</th>
                   <th className="py-2 pr-3">Mapped PLOs</th>
+                  <th className="py-2 pr-3">SLT / Focus</th>
                   <th className="py-2 pr-3">Assessment Methods</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 text-right">Actions</th>
@@ -177,7 +209,7 @@ export function ClosSection({
               <tbody>
                 {visible.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
                       No CLOs match your search.
                     </td>
                   </tr>
@@ -203,6 +235,19 @@ export function ClosSection({
                         </td>
                         <td className="py-3 pr-3 text-foreground">
                           {clo.mappedPlos.length ? clo.mappedPlos.join(", ") : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="py-3 pr-3 text-muted-foreground">
+                          {clo.sltHours ? (
+                            <>
+                              {clo.sltHours}h
+                              {(() => {
+                                const code = focusCodeOf(focusPercentOf(clo.sltHours, courseTotalSlt));
+                                return code ? ` · ${code}` : "";
+                              })()}
+                            </>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="max-w-[220px] py-3 pr-3 text-muted-foreground">
                           {clo.assessmentMethodIds.length
